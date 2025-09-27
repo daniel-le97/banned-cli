@@ -36,6 +36,7 @@ type Video struct {
 	AngerCount    int     `json:"angerCount,omitempty"`
 	EmbedURL      string  `json:"embedUrl,omitempty"`
 	Published     bool    `json:"published,omitempty"`
+	FileSize      int64   `json:"fileSize,omitempty"`
 }
 
 // Channel represents a channel structure

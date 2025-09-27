@@ -202,6 +202,7 @@ func createTables() error {
 		published BOOLEAN DEFAULT TRUE,
 		downloaded BOOLEAN DEFAULT FALSE,
 		file_path TEXT,
+		file_size INTEGER DEFAULT 0,
 		torrent_created BOOLEAN DEFAULT FALSE,
 		torrent_path TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -229,6 +230,49 @@ func createTables() error {
 	// Insert default settings if they don't exist
 	if err := insertDefaultSettings(); err != nil {
 		return fmt.Errorf("failed to insert default settings: %w", err)
+	}
+
+	// Run migrations
+	if err := runMigrations(); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	return nil
+}
+
+// runMigrations handles database schema migrations
+func runMigrations() error {
+	if DB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	// Check if file_size column exists, if not, add it
+	var count int
+	err := DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('videos') WHERE name='file_size'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check for file_size column: %w", err)
+	}
+
+	if count == 0 {
+		_, err := DB.Exec("ALTER TABLE videos ADD COLUMN file_size INTEGER DEFAULT 0")
+		if err != nil {
+			return fmt.Errorf("failed to add file_size column: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// UpdateVideoFileSize updates the file_size for a video in the database
+func UpdateVideoFileSize(videoID string, fileSize int64) error {
+	if DB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	query := `UPDATE videos SET file_size = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := DB.Exec(query, fileSize, videoID)
+	if err != nil {
+		return fmt.Errorf("failed to update video file size: %w", err)
 	}
 
 	return nil
@@ -406,7 +450,7 @@ func GetChannelVideos(channelID string, limit, offset int) ([]Video, error) {
 
 	query := `
 		SELECT id, title, summary, large_image, video_duration, created_at_api,
-			   direct_url, play_count, like_count, anger_count, embed_url, published
+			   direct_url, play_count, like_count, anger_count, embed_url, published, file_size
 		FROM videos 
 		WHERE channel_id = ? 
 		ORDER BY created_at_api DESC 
@@ -426,7 +470,7 @@ func GetChannelVideos(channelID string, limit, offset int) ([]Video, error) {
 			&video.ID, &video.Title, &video.Summary, &video.LargeImage,
 			&video.VideoDuration, &video.CreatedAt, &video.DirectURL,
 			&video.PlayCount, &video.LikeCount, &video.AngerCount,
-			&video.EmbedURL, &video.Published,
+			&video.EmbedURL, &video.Published, &video.FileSize,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan video: %w", err)
