@@ -1,0 +1,2213 @@
+#
+type Query {
+  #
+  twoFactorSecret: TwoFactorSecretKey
+
+  #
+  getUser: User
+
+  #
+  getAdminActions(offset: Float, limit: Float = 50): [AdminAction!]!
+
+  #
+  meAdmin: AdminUser!
+
+  #
+  getAdminUser(id: String!): AdminUser!
+
+  #
+  getAdminUsers: [AdminUser!]!
+
+  #
+  getAdminUserByEmail(email: String!): AdminUser!
+
+  #
+  getRecentAdminUsers(offset: Float!, limit: Float = 10): [AdminUser!]!
+
+  #
+  verifyToken: Boolean!
+
+  #
+  getChannel(id: String!): Channel!
+
+  #
+  getChannelByIdOrTitle(id: String!): Channel!
+
+  #
+  getAdminChannel(id: String!): Channel!
+
+  #
+  getChannels(ids: [String!]!): [Channel!]!
+
+  #
+  getAllChannels(offset: Float, limit: Float): [Channel!]!
+
+  #
+  getAdminChannels(offset: Float, limit: Float): [Channel!]!
+
+  #
+  getRecentChannels(offset: Float, limit: Float = 10): [Channel!]!
+
+  #
+  getComment(id: String!): Comment!
+
+  #
+  getComments(offset: Float, limit: Float = 50): [Comment!]!
+
+  #
+  getAllComments(query: String, offset: Float, limit: Float = 50): [Comment!]!
+
+  #
+  getAllCommentsAmountSince(since: DateTime!): Float!
+
+  #
+  getReportedComments(
+    query: String
+    offset: Float
+    limit: Float = 50
+  ): [Comment!]!
+
+  #
+  getReportedCommentsAmountSince(since: DateTime!): Float!
+
+  #
+  getApprovedComments(
+    query: String
+    offset: Float
+    limit: Float = 50
+  ): [Comment!]!
+
+  #
+  getApprovedCommentsAmountSince(since: DateTime!): Float!
+
+  #
+  getRejectedComments(
+    query: String
+    offset: Float
+    limit: Float = 50
+  ): [Comment!]!
+
+  #
+  getRejectedCommentsAmountSince(since: DateTime!): Float!
+
+  #
+  getUnfilteredComments(
+    query: String
+    offset: Float
+    limit: Float = 50
+  ): [Comment!]!
+
+  #
+  getUnfilteredCommentsAmountSince(since: DateTime!): Float!
+
+  #
+  getVideoComments(offset: Float, limit: Float = 50, id: String!): [Comment!]!
+
+  #
+  getAllVideoComments(
+    offset: Float
+    limit: Float = 50
+    id: String!
+  ): [Comment!]!
+
+  #
+  getUserComments(offset: Float, limit: Float = 50, id: String!): [Comment!]!
+
+  #
+  getCommentReplies(offset: Float, limit: Float = 50, id: String!): [Comment!]!
+
+  #
+  getCommentReports(id: String!): [Report!]!
+
+  #
+  getConfig(id: String!): Config!
+
+  #
+  getActiveConfig: Config!
+
+  #
+  adminGetActiveConfig: Config!
+
+  #
+  getHomeLayout(id: String!): HomeLayout!
+
+  #
+  getActiveHomeLayout: HomeLayout!
+
+  #
+  adminGetActiveHomeLayout: HomeLayout!
+
+  #
+  getMyNotifications(offset: Float = 0, limit: Float = 10): [Notification!]!
+
+  #
+  getPlaylist(id: String!): Playlist!
+
+  #
+  getAdminPlaylist(id: String!): Playlist!
+
+  #
+  getPlaylists(ids: [String!]!): [Playlist!]!
+
+  #
+  getAllPlaylists(offset: Float, limit: Float = 10): [Playlist!]!
+
+  #
+  getAdminPlaylists(offset: Float, limit: Float = 10): [Playlist!]!
+
+  #
+  getPoster(offset: Float = 0, limit: Float = 10): [Poster!]!
+
+  #
+  getSale(id: String!): Sale!
+
+  #
+  getSales: [Sale!]!
+
+  #
+  search(
+    category: String
+    offset: Float
+    limit: Float = 20
+    query: String!
+  ): SearchResult!
+
+  #
+  getTag(id: String!): Tag!
+
+  #
+  getTags(searchQuery: String!, limit: Float = 100): [Tag!]!
+
+  #
+  getTagByName(name: String!): Tag!
+
+  #
+  getTagVideos(offset: Float = 0, limit: Float = 12, id: String!): [Video!]!
+
+  #
+  getUpload(id: String!): Upload!
+
+  #
+  me: User
+
+  #
+  user(username: String, id: String): User
+
+  #
+  getAllUsers(query: String, offset: Float, limit: Float = 50): [User!]!
+
+  #
+  getMyAngryHistory(offset: Float, limit: Float = 50): [UserAngryHistory!]!
+
+  #
+  getMyLikeHistory(offset: Float, limit: Float = 50): [UserLikeHistory!]!
+
+  #
+  getUserPlaylist(id: String!): UserPlaylist!
+
+  #
+  getUserPlaylists(ids: [String!]!): [UserPlaylist!]!
+
+  #
+  getMyWatchHistory(offset: Float, limit: Float = 50): [UserWatchHistory!]!
+
+  #
+  getVideo(id: String!): Video!
+
+  #
+  getVideos(ids: [String!]!): [Video!]!
+
+  #
+  getScheduledVideos: [Video!]!
+
+  #
+  getHotVideos(offset: Float = 0, limit: Float = 50): [Video!]!
+
+  #
+  getNewVideos(offset: Float = 0, limit: Float = 50): [Video!]!
+
+  #
+  getSubscribedVideos(
+    offset: Float = 0
+    limit: Float = 20
+    id: String
+  ): [Video!]!
+
+  #
+  getLiveVideoStatus(id: String!): Boolean!
+
+  #
+  getVideoViews(offset: Float, limit: Float = 50): [VideoView!]!
+
+  #
+  getVideoVideoViews(
+    offset: Float
+    limit: Float = 50
+    id: String!
+  ): [VideoView!]!
+
+  #
+  getChannelVideoViews(
+    offset: Float
+    limit: Float = 50
+    id: String!
+  ): [VideoView!]!
+
+  #
+  getPlaylistVideoViews(
+    offset: Float
+    limit: Float = 50
+    id: String!
+  ): [VideoView!]!
+
+  #
+  getUserVideoViews(
+    offset: Float
+    limit: Float = 50
+    id: String!
+  ): [VideoView!]!
+
+  #
+  getVotes(offset: Float, limit: Float = 50): [Vote!]!
+
+  #
+  getVideoVoteCount(id: String!): VoteCount!
+
+  #
+  getCommentVoteCount(id: String!): VoteCount!
+
+  #
+  getUserVotes(offset: Float, limit: Float = 50, id: String!): [Vote!]!
+}
+
+#
+type TwoFactorSecretKey {
+  #
+  ascii: String
+
+  #
+  base32: String
+
+  #
+  hex: String
+
+  #
+  qr_code_ascii: String
+
+  #
+  qr_code_hex: String
+
+  #
+  qr_code_base32: String
+
+  #
+  google_auth_qr: String
+
+  #
+  otpauth_url: String
+}
+
+#
+type User {
+  #
+  id: ID!
+
+  #
+  emails: [EmailRecord!]
+
+  #
+  username: String
+
+  #
+  _id: ID!
+
+  #
+  karma: Float!
+
+  #
+  commentBan: Boolean
+
+  #
+  subscribedChannels: [SubscribedChannel!]!
+
+  #
+  deactivated: Boolean
+
+  #
+  pushSubscriptions: [PushSubscription!]
+
+  #
+  emailNotificationSettings: EmailNotificationSettings
+
+  #
+  pushRequested: Boolean!
+
+  #
+  chatToken: String!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+
+  #
+  watchLaterPlaylist: UserPlaylist!
+}
+
+#
+type EmailRecord {
+  #
+  address: String
+
+  #
+  verified: Boolean
+}
+
+#
+type SubscribedChannel {
+  #
+  channel: Channel!
+
+  #
+  lastSeen: DateTime!
+}
+
+#
+type Channel {
+  #
+  _id: ID!
+
+  #
+  title: String
+
+  #
+  summary: String
+
+  #
+  textInfo: String
+
+  #
+  featuredVideo: Video
+
+  #
+  liveStreamVideo: Video
+
+  #
+  alwaysLive: Boolean
+
+  #
+  dayTimesLive: DayTimesLive
+
+  #
+  isLive: Boolean
+
+  #
+  avatar: String
+
+  #
+  coverImage: String
+
+  #
+  showInfo: ShowInfo
+
+  #
+  creator: AdminUser
+
+  #
+  totalVideoViews: Float
+
+  #
+  totalLikes: Float!
+
+  #
+  playlists: [Playlist!]
+
+  #
+  playlistOrder: [String]
+
+  #
+  hotVideos(offset: Float = 0, limit: Float = 12): [Video!]!
+
+  #
+  totalVideos: Float
+
+  #
+  totalPlaylists: Float
+
+  #
+  links: ChannelLinks
+
+  #
+  lastUpload: DateTime
+
+  #
+  createdAt: DateTime
+
+  #
+  updatedAt: DateTime
+
+  #
+  videos(
+    includeUnlisted: Boolean
+    includeUnpublished: Boolean
+    includeLive: Boolean
+    offset: Float
+    limit: Float = 12
+  ): [Video!]!
+}
+
+#
+type Video {
+  #
+  _id: ID!
+
+  #
+  title: String!
+
+  #
+  summary: String!
+
+  #
+  published: Boolean!
+
+  #
+  unlisted: Boolean
+
+  #
+  creator: AdminUser!
+
+  #
+  channel: Channel!
+
+  #
+  tags: [Tag!]!
+
+  #
+  videoDuration: Float
+
+  #
+  audioUpload: Upload
+
+  #
+  posterUpload: Upload
+
+  #
+  videoUpload: Upload
+
+  #
+  live: Boolean!
+
+  #
+  disableComment: Boolean
+
+  #
+  liveStreamUrl: String
+
+  #
+  timeWatched: Float
+
+  #
+  isInWatchLater: Boolean
+
+  #
+  largeImage: String
+
+  #
+  playCount: Float!
+
+  #
+  likeCount: Float!
+
+  #
+  angerCount: Float!
+
+  #
+  liked: Boolean
+
+  #
+  disLiked: Boolean
+
+  #
+  sale: Sale
+
+  #
+  publishedAt: DateTime!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+
+  #
+  thumbnailImage: String
+
+  #
+  streamUrl: String
+
+  #
+  directUrl: String
+
+  #
+  liveInfo: LiveInfo
+
+  #
+  embedUrl: String!
+
+  #
+  disliked: Boolean!
+
+  #
+  audio: String
+
+  #
+  playlists: [Playlist!]!
+}
+
+#
+type AdminUser {
+  #
+  _id: ID!
+
+  #
+  email: String!
+
+  #
+  password: String
+
+  #
+  isAdmin: Boolean
+
+  #
+  token: String
+
+  #
+  provider: String
+
+  #
+  displayName: String
+
+  #
+  roles: [Roles!]!
+
+  #
+  collaboratingChannels: [Channel]
+
+  #
+  suspended: Boolean
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+
+  #
+  playlists(public: Boolean, offset: Float, limit: Float = 10): [Playlist!]!
+
+  #
+  videos(includeLive: Boolean, offset: Float, limit: Float = 12): [Video!]!
+
+  #
+  channels(offset: Float, limit: Float = 10): [Channel!]!
+}
+
+# Roles for admins and users
+enum Roles {
+  #
+  superAdmin
+
+  #
+  admin
+
+  #
+  uploader
+
+  #
+  moderator
+
+  #
+  sales
+
+  #
+  user
+
+  #
+  anon
+}
+
+# The javascript `Date` as string. Type represents date and time as the ISO Date string.
+scalar DateTime
+
+#
+type Playlist {
+  #
+  _id: ID!
+
+  #
+  title: String
+
+  #
+  summary: String
+
+  #
+  description: String
+
+  #
+  channel: Channel
+
+  #
+  creator: AdminUser!
+
+  #
+  videos(offset: Float, limit: Float = 12): [Video!]!
+
+  #
+  isPublic: Boolean
+
+  #
+  isGlobal: Boolean
+
+  #
+  totalVideos: Float!
+
+  #
+  totalVideoViews: Float!
+
+  #
+  videoIds: [String!]!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type Tag {
+  #
+  _id: ID!
+
+  #
+  name: String!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type Upload {
+  #
+  _id: ID!
+
+  #
+  name: String!
+
+  #
+  key: String
+
+  #
+  bucket: String
+
+  #
+  thumbnailImageKey: String
+
+  #
+  largeImageKey: String
+
+  #
+  mimetype: String!
+
+  #
+  size: Float!
+
+  #
+  creator: AdminUser!
+
+  #
+  cloudflareVideoUID: String
+
+  #
+  cloudflareVideoReady: Boolean!
+
+  #
+  videoDuration: Float
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type Sale {
+  #
+  _id: ID!
+
+  #
+  type: SaleType!
+
+  #
+  text: String!
+
+  #
+  textSale: String
+
+  #
+  description: String
+
+  #
+  url: String
+
+  #
+  isHidden: Boolean
+
+  #
+  videoUpload: Upload
+
+  #
+  clicks: Float!
+
+  #
+  amountServed: Float!
+
+  #
+  creator: AdminUser!
+
+  #
+  clickRate: Float
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+# Type of sale
+enum SaleType {
+  #
+  text
+
+  #
+  video
+}
+
+#
+type LiveInfo {
+  #
+  ingestURL: String!
+
+  #
+  ingestUser: String!
+
+  #
+  ingestPassword: String!
+
+  #
+  streamKey: String!
+}
+
+#
+type DayTimesLive {
+  #
+  sun: [String!]!
+
+  #
+  mon: [String!]!
+
+  #
+  tue: [String!]!
+
+  #
+  wed: [String!]!
+
+  #
+  thu: [String!]!
+
+  #
+  fri: [String!]!
+
+  #
+  sat: [String!]!
+}
+
+#
+type ShowInfo {
+  #
+  times: String!
+
+  #
+  phone: String!
+}
+
+#
+type ChannelLinks {
+  #
+  website: String
+
+  #
+  facebook: String
+
+  #
+  twitter: String
+
+  #
+  gab: String
+
+  #
+  minds: String
+
+  #
+  subscribeStar: String
+
+  #
+  telegram: String
+}
+
+#
+type PushSubscription {
+  #
+  endpoint: String!
+
+  #
+  p256dh: String!
+
+  #
+  auth: String!
+}
+
+#
+type EmailNotificationSettings {
+  #
+  disableNewUpload: Boolean!
+}
+
+#
+type UserPlaylist {
+  #
+  _id: ID!
+
+  #
+  title: String!
+
+  #
+  user: User!
+
+  #
+  videos(offset: Float, limit: Float = 12): [Video!]!
+
+  #
+  isPublic: Boolean!
+
+  #
+  isWatchLater: Boolean!
+
+  #
+  totalVideos: Float!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type AdminAction {
+  #
+  _id: ID!
+
+  #
+  adminUser: AdminUser!
+
+  #
+  type: ActionType!
+
+  #
+  video: Video
+
+  #
+  channel: Channel
+
+  #
+  playlist: Playlist
+
+  #
+  config: Config
+
+  #
+  tag: Tag
+
+  #
+  title: String
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+# Action type for admins
+enum ActionType {
+  #
+  createChannel
+
+  #
+  updateChannelPlaylistOrder
+
+  #
+  updateChannel
+
+  #
+  removeChannelFeaturedVideo
+
+  #
+  removeChannelLiveStreamVideo
+
+  #
+  removeChannel
+
+  #
+  createConfig
+
+  #
+  updateConfig
+
+  #
+  createPlaylist
+
+  #
+  updatePlaylist
+
+  #
+  removePlaylist
+
+  #
+  addVideosToPlaylist
+
+  #
+  removeVideosFromPlaylist
+
+  #
+  createSale
+
+  #
+  resetSaleClicks
+
+  #
+  resetAllSaleClicks
+
+  #
+  createTag
+
+  #
+  createVideo
+
+  #
+  updateVideo
+
+  #
+  removeVideo
+
+  #
+  approveComment
+
+  #
+  rejectComment
+
+  #
+  banUser
+
+  #
+  unbanUser
+}
+
+#
+type Config {
+  #
+  _id: ID!
+
+  #
+  title: String!
+
+  #
+  creator: AdminUser!
+
+  #
+  featuredVideos: [Video!]!
+
+  #
+  navigationChannels: [Channel]
+
+  #
+  isActive: Boolean!
+
+  #
+  headerSaleActive: Boolean!
+
+  #
+  liveChannelId: String
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type Comment {
+  #
+  _id: ID!
+
+  #
+  content: String!
+
+  #
+  user: User!
+
+  #
+  video: Video
+
+  #
+  replyTo: Comment
+
+  #
+  linkedUser: User
+
+  #
+  reported: Boolean!
+
+  #
+  approved: Boolean!
+
+  #
+  rejected: Boolean!
+
+  #
+  spam: Boolean!
+
+  #
+  duplicate: Boolean
+
+  #
+  bannedFromComment: Boolean
+
+  #
+  rejectedByUploader: Boolean
+
+  #
+  reports: [Report!]!
+
+  #
+  reqHeaders: ReqHeaders!
+
+  #
+  replies(offset: Float, limit: Float = 50): [Comment!]
+
+  #
+  voteCount: VoteCount!
+
+  #
+  liked: Boolean!
+
+  #
+  replyCount: Float!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type Report {
+  #
+  id: String!
+
+  #
+  user: User!
+
+  #
+  content: String!
+
+  #
+  type: ReportType!
+}
+
+#
+enum ReportType {
+  #
+  report
+
+  #
+  spam
+}
+
+#
+type ReqHeaders {
+  #
+  ipAddress: String!
+
+  #
+  userAgent: String!
+
+  #
+  referrer: String!
+}
+
+#
+type VoteCount {
+  #
+  positive: Float!
+
+  #
+  negative: Float!
+}
+
+#
+type HomeLayout {
+  #
+  _id: ID!
+
+  #
+  title: String!
+
+  #
+  creator: AdminUser!
+
+  #
+  featuredVideos: [Video!]!
+
+  #
+  navigationChannels: [Channel!]!
+
+  #
+  isActive: Boolean!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type Notification {
+  #
+  _id: ID!
+
+  #
+  user: User!
+
+  #
+  seen: Boolean!
+
+  #
+  opened: Boolean!
+
+  #
+  hidden: Boolean!
+
+  #
+  receivedPush: Boolean!
+
+  #
+  openedPush: Boolean!
+
+  #
+  openedEmail: Boolean!
+
+  #
+  type: NotificationType!
+
+  #
+  comment: Comment
+
+  #
+  video: Video
+
+  #
+  channel: Channel
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+# Type of notification
+enum NotificationType {
+  #
+  commentReply
+
+  #
+  commentMention
+
+  #
+  newVideo
+}
+
+#
+type Poster {
+  #
+  id: String!
+
+  #
+  largeUrl: String!
+
+  #
+  thumbnailUrl: String!
+}
+
+#
+type SearchResult {
+  #
+  videos: [Video!]
+
+  #
+  channels: [Channel!]
+}
+
+#
+type UserAngryHistory {
+  #
+  _id: ID!
+
+  #
+  video: Video!
+
+  #
+  user: User!
+
+  #
+  dateDisLiked: DateTime!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type UserLikeHistory {
+  #
+  _id: ID!
+
+  #
+  video: Video!
+
+  #
+  user: User!
+
+  #
+  dateLiked: DateTime!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type UserWatchHistory {
+  #
+  _id: ID!
+
+  #
+  video: Video!
+
+  #
+  user: User!
+
+  #
+  dateLastWatched: DateTime!
+
+  #
+  timeWatched: Float
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type VideoView {
+  #
+  _id: ID!
+
+  #
+  video: Video!
+
+  #
+  channel: Channel!
+
+  #
+  playlist: Playlist!
+
+  #
+  user: User!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type Vote {
+  #
+  _id: ID!
+
+  #
+  video: Video
+
+  #
+  comment: Comment
+
+  #
+  user: User!
+
+  #
+  type: VoteType!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+# Type of vote
+enum VoteType {
+  #
+  positive
+
+  #
+  negative
+}
+
+#
+type Mutation {
+  #
+  createUser(user: CreateUserInput!): ID
+
+  #
+  verifyEmail(token: String!): Boolean
+
+  #
+  resetPassword(token: String!, newPassword: String!): LoginResult
+
+  #
+  sendVerificationEmail(email: String!): Boolean
+
+  #
+  sendResetPasswordEmail(email: String!): Boolean
+
+  #
+  changePassword(oldPassword: String!, newPassword: String!): Boolean
+
+  #
+  twoFactorSet(secret: TwoFactorSecretKeyInput!, code: String!): Boolean
+
+  #
+  twoFactorUnset(code: String!): Boolean
+
+  #
+  impersonate(accessToken: String!, username: String!): ImpersonateReturn
+
+  #
+  refreshTokens(accessToken: String!, refreshToken: String!): LoginResult
+
+  #
+  logout: Boolean
+
+  #
+  authenticate(
+    serviceName: String!
+    params: AuthenticateParamsInput!
+  ): LoginResult
+
+  #
+  loginAdmin(password: String!, email: String!): String!
+
+  #
+  signUpAdminUser(password: String!, email: String!): AdminUser!
+
+  #
+  resetAdminUserPassword(newPassword: String!, email: String!): Boolean!
+
+  #
+  resetPasswordAdmin(
+    newPasswordConfirmed: String!
+    newPassword: String!
+    currentPassword: String!
+  ): String!
+
+  #
+  resetPasswordAdminToken(
+    newPasswordConfirmed: String!
+    newPassword: String!
+    token: String!
+  ): String!
+
+  #
+  forgotPasswordAdmin(email: String!): Boolean!
+
+  #
+  setAdminUserPermissions(
+    channels: [String!]!
+    roles: [Roles!]!
+    id: String!
+  ): AdminUser!
+
+  #
+  suspendAdminUser(id: String!): Boolean!
+
+  #
+  createChannel(channel: ChannelInput!): Channel!
+
+  #
+  updateChannelPlaylistsOrder(order: [String!]!, id: String!): Channel!
+
+  #
+  updateChannel(channel: UpdateChannelInput!, id: String!): Channel!
+
+  #
+  removeChannelFeaturedVideo(id: String!): Channel!
+
+  #
+  removeChannelLiveStreamVideo(id: String!): Channel!
+
+  #
+  removeChannel(id: String!): Boolean!
+
+  #
+  createComment(comment: CommentInput!): Comment!
+
+  #
+  approveComment(id: String!): Comment!
+
+  #
+  rejectComment(id: String!): Comment!
+
+  #
+  reportComment(report: ReportInput!): Boolean!
+
+  #
+  removeComment(id: String!): Boolean!
+
+  #
+  createConfig(config: ConfigInput!): Config!
+
+  #
+  updateConfig(config: UpdateConfigInput!, id: String!): Config!
+
+  #
+  submitContributorSignup(signup: SubmitContributorSignupInput!): Boolean!
+
+  #
+  createHomeLayout(homeLayout: HomeLayoutInput!): HomeLayout!
+
+  #
+  updateHomeLayout(homeLayout: UpdateHomeLayoutInput!, id: String!): HomeLayout!
+
+  #
+  setNotificationOpened(id: String!): Notification!
+
+  #
+  setNotificationsSeen(ids: [String!]!): [Notification!]!
+
+  #
+  setPushNotificationReceived(token: String!, id: String!): Boolean!
+
+  #
+  setPushNotificationOpened(token: String!, id: String!): Boolean!
+
+  #
+  createPlaylist(playlist: PlaylistInput!): Playlist!
+
+  #
+  updatePlaylist(playlist: UpdatePlaylistInput!, id: String!): Playlist!
+
+  #
+  removePlaylist(id: String!): Boolean!
+
+  #
+  addVideosToPlaylist(videoIds: [String!]!, id: String!): Playlist!
+
+  #
+  removeVideosFromPlaylist(videoIds: [String!]!, id: String!): Playlist!
+
+  #
+  createSale(
+    textSale: String!
+    videoUploadId: String!
+    url: String!
+    description: String!
+    text: String!
+  ): Sale!
+
+  #
+  updateSale(
+    textSale: String!
+    url: String!
+    description: String!
+    text: String!
+    id: String!
+  ): Sale!
+
+  #
+  resetSaleClicks(id: String!): Sale!
+
+  #
+  resetAllSaleClicks: [Sale!]!
+
+  #
+  incrementSaleClick(id: String!): Boolean!
+
+  #
+  toggleHidden(isChecked: Boolean!, id: String!): Boolean!
+
+  #
+  removeSale(id: String!): Boolean!
+
+  #
+  createTag(name: String!): Tag!
+
+  #
+  removeUpload(id: String!): Boolean!
+
+  #
+  deleteAccount: Boolean!
+
+  #
+  updateUsername(username: String!): User!
+
+  #
+  updateEmail(email: String!): User!
+
+  #
+  toggleUserCommentBan(id: String!): User!
+
+  #
+  toggleChannelSubscription(id: String!): User!
+
+  #
+  setUserPushSubscription(pushSubscription: PushSubscriptionInput!): Boolean!
+
+  #
+  toggleDisableNewUploadEmail: Boolean!
+
+  #
+  setPushRequested: Boolean!
+
+  #
+  createUserPlaylist(userPlaylist: UserPlaylistInput!): UserPlaylist!
+
+  #
+  updateUserPlaylist(
+    userPlaylist: UpdateUserPlaylistInput!
+    id: String!
+  ): UserPlaylist!
+
+  #
+  removeUserPlaylist(id: String!): Boolean!
+
+  #
+  addVideoToUserPlaylist(videoId: String!, id: String!): UserPlaylist!
+
+  #
+  removeVideoFromUserPlaylist(videoId: String!, id: String!): UserPlaylist!
+
+  #
+  addWatchLaterToUsers: Boolean!
+
+  #
+  setVideoTimeWatched(timeWatched: Float!, id: String!): Boolean!
+
+  #
+  incrementViewCount(id: String!): Boolean!
+
+  #
+  incrementLikeCount(id: String!): Video!
+
+  #
+  incrementAngryCount(id: String!): Video!
+
+  #
+  toggleCommentsActive(id: String!): Boolean!
+
+  #
+  createVideo(video: VideoInput!): Video!
+
+  #
+  updateVideo(create: Boolean, video: UpdateVideoInput!, id: String!): Video!
+
+  #
+  removeVideo(id: String!): Boolean!
+
+  #
+  likeComment(id: String!): Comment!
+
+  #
+  dislikeComment(id: String!): Comment!
+
+  #
+  likeVideo(id: String!): Video!
+
+  #
+  dislikeVideo(id: String!): Video!
+}
+
+#
+input CreateUserInput {
+  #
+  username: String
+
+  #
+  email: String
+
+  #
+  password: String
+
+  #
+  recaptchaToken: String!
+}
+
+#
+type LoginResult {
+  #
+  sessionId: String
+
+  #
+  tokens: Tokens
+}
+
+#
+type Tokens {
+  #
+  refreshToken: String
+
+  #
+  accessToken: String
+}
+
+#
+input TwoFactorSecretKeyInput {
+  #
+  ascii: String
+
+  #
+  base32: String
+
+  #
+  hex: String
+
+  #
+  qr_code_ascii: String
+
+  #
+  qr_code_hex: String
+
+  #
+  qr_code_base32: String
+
+  #
+  google_auth_qr: String
+
+  #
+  otpauth_url: String
+}
+
+#
+type ImpersonateReturn {
+  #
+  authorized: Boolean
+
+  #
+  tokens: Tokens
+
+  #
+  user: User
+}
+
+#
+input AuthenticateParamsInput {
+  #
+  access_token: String
+
+  #
+  access_token_secret: String
+
+  #
+  provider: String
+
+  #
+  password: String
+
+  #
+  user: UserInput
+
+  #
+  code: String
+}
+
+#
+input UserInput {
+  #
+  id: ID
+
+  #
+  email: String
+
+  #
+  username: String
+}
+
+#
+input ChannelInput {
+  #
+  title: String!
+
+  #
+  summary: String!
+
+  #
+  avatar: String!
+
+  #
+  coverImage: String!
+}
+
+#
+input UpdateChannelInput {
+  #
+  title: String
+
+  #
+  summary: String
+
+  #
+  textInfo: String
+
+  #
+  avatar: String
+
+  #
+  coverImage: String
+
+  #
+  featuredVideo: String
+
+  #
+  liveStreamVideo: String
+
+  #
+  showInfo: ShowInfoInput
+
+  #
+  links: ChannelLinksInput
+
+  #
+  alwaysLive: Boolean
+
+  #
+  dayTimesLive: DayTimesLiveInput
+}
+
+#
+input ShowInfoInput {
+  #
+  times: String!
+
+  #
+  phone: String!
+}
+
+#
+input ChannelLinksInput {
+  #
+  website: String
+
+  #
+  facebook: String
+
+  #
+  twitter: String
+
+  #
+  gab: String
+
+  #
+  minds: String
+
+  #
+  subscribeStar: String
+
+  #
+  telegram: String
+}
+
+#
+input DayTimesLiveInput {
+  #
+  sun: [String!]!
+
+  #
+  mon: [String!]!
+
+  #
+  tue: [String!]!
+
+  #
+  wed: [String!]!
+
+  #
+  thu: [String!]!
+
+  #
+  fri: [String!]!
+
+  #
+  sat: [String!]!
+}
+
+#
+input CommentInput {
+  #
+  content: String!
+
+  #
+  videoId: String!
+
+  #
+  replyToId: String
+
+  #
+  linkedUserId: String
+}
+
+#
+input ReportInput {
+  #
+  content: String!
+
+  #
+  commentId: String!
+}
+
+#
+input ConfigInput {
+  #
+  title: String!
+
+  #
+  isActive: Boolean!
+}
+
+#
+input UpdateConfigInput {
+  #
+  isActive: Boolean!
+
+  #
+  featuredVideoIds: [String!]
+
+  #
+  navigationChannelIds: [String!]
+
+  #
+  headerSaleActive: Boolean
+}
+
+#
+input SubmitContributorSignupInput {
+  #
+  fullName: String!
+
+  #
+  email: String!
+
+  #
+  twitter: String
+
+  #
+  instagram: String
+
+  #
+  youtube: String
+
+  #
+  otherSocialProfiles: String
+
+  #
+  video1: String!
+
+  #
+  video2: String!
+}
+
+#
+input HomeLayoutInput {
+  #
+  title: String!
+
+  #
+  isActive: Boolean!
+}
+
+#
+input UpdateHomeLayoutInput {
+  #
+  isActive: Boolean!
+
+  #
+  featuredVideoIds: [String!]
+
+  #
+  navigationChannelIds: [String!]
+}
+
+#
+input PlaylistInput {
+  #
+  title: String!
+
+  #
+  channel: String
+
+  #
+  summary: String
+
+  #
+  isPublic: Boolean
+
+  #
+  isGlobal: Boolean
+
+  #
+  videoIds: [String!]!
+}
+
+#
+input UpdatePlaylistInput {
+  #
+  title: String
+
+  #
+  summary: String
+
+  #
+  isPublic: Boolean
+
+  #
+  videoIds: [String!]
+}
+
+#
+input PushSubscriptionInput {
+  #
+  endpoint: String!
+
+  #
+  p256dh: String!
+
+  #
+  auth: String!
+}
+
+#
+input UserPlaylistInput {
+  #
+  title: String!
+
+  #
+  isPublic: Boolean
+
+  #
+  videoIds: [String!]!
+}
+
+#
+input UpdateUserPlaylistInput {
+  #
+  title: String
+
+  #
+  isPublic: Boolean
+}
+
+#
+input VideoInput {
+  #
+  title: String!
+
+  #
+  summary: String!
+
+  #
+  channelId: String!
+
+  #
+  playlistId: String!
+
+  #
+  published: Boolean!
+
+  #
+  disableComment: Boolean
+
+  #
+  unlisted: Boolean!
+
+  #
+  live: Boolean
+
+  #
+  posterUploadId: String!
+
+  #
+  videoUploadId: String
+
+  #
+  audioUploadId: String
+
+  #
+  liveStreamUrl: String
+
+  #
+  tagIds: [String!]
+
+  #
+  newTags: [String!]
+
+  #
+  publishedAt: DateTime!
+
+  #
+  useFeed: Boolean
+
+  #
+  feed: String
+}
+
+#
+input UpdateVideoInput {
+  #
+  title: String
+
+  #
+  summary: String
+
+  #
+  channelId: String
+
+  #
+  published: Boolean
+
+  #
+  disableComment: Boolean
+
+  #
+  unlisted: Boolean
+
+  #
+  live: Boolean
+
+  #
+  posterUploadId: String
+
+  #
+  videoUploadId: String
+
+  #
+  audioUploadId: String
+
+  #
+  liveStreamUrl: String
+
+  #
+  tagIds: [String!]
+
+  #
+  newTags: [String!]
+
+  #
+  useFeed: Boolean
+
+  #
+  feed: String
+
+  #
+  publishedAt: DateTime
+}
+
+#
+type ContributorSignup {
+  #
+  _id: ID!
+
+  #
+  fullName: String!
+
+  #
+  email: String!
+
+  #
+  twitter: String!
+
+  #
+  instagram: String!
+
+  #
+  youtube: String!
+
+  #
+  otherSocialProfiles: String!
+
+  #
+  video1: String!
+
+  #
+  video2: String!
+
+  #
+  user: User!
+
+  #
+  createdAt: DateTime!
+
+  #
+  updatedAt: DateTime!
+}
+
+#
+type VideoInfo {
+  #
+  ingestURL: String!
+
+  #
+  ingestUser: String!
+
+  #
+  ingestPassword: String!
+
+  #
+  streamKey: String!
+}
