@@ -31,7 +31,7 @@ development version information.`,
 
 func showVersion() {
 	fmt.Printf("%s version %s\n", AppName, getVersionFromMain())
-	
+
 	// If built with GoReleaser, show additional info
 	commit, date := getBuildInfo()
 	if commit != "none" && commit != "" {
@@ -40,7 +40,7 @@ func showVersion() {
 	if date != "unknown" && date != "" {
 		fmt.Printf("Built: %s\n", date)
 	}
-	
+
 	fmt.Printf("Runtime: %s %s/%s\n", runtime.Version(), runtime.GOOS, runtime.GOARCH)
 }
 

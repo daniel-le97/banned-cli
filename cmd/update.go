@@ -194,7 +194,7 @@ func checkForUpdates() error {
 	} else {
 		fmt.Printf("🆕 A new version is available!\n")
 		fmt.Printf("Run '%s update' to install the latest version.\n", AppName)
-		
+
 		if release.Body != "" {
 			fmt.Printf("\n📝 Release Notes:\n%s\n", release.Body)
 		}
@@ -260,7 +260,7 @@ func getAssetName(goos, goarch string) string {
 
 	// Convert Go OS names to GoReleaser names
 	osName := strings.Title(goos)
-	
+
 	return fmt.Sprintf("%s_%s_%s", AppName, osName, arch)
 }
 
@@ -391,19 +391,19 @@ func replaceBinary(newBinaryPath, currentBinaryPath string) error {
 		backupPath := currentBinaryPath + ".old"
 		// Remove old backup if exists
 		os.Remove(backupPath)
-		
+
 		// Move current binary to backup
 		if err := os.Rename(currentBinaryPath, backupPath); err != nil {
 			return fmt.Errorf("failed to backup current binary: %w", err)
 		}
-		
+
 		// Move new binary to current location
 		if err := os.Rename(newBinaryPath, currentBinaryPath); err != nil {
 			// Try to restore backup
 			os.Rename(backupPath, currentBinaryPath)
 			return fmt.Errorf("failed to install new binary: %w", err)
 		}
-		
+
 		// Remove backup on success
 		os.Remove(backupPath)
 	} else {
