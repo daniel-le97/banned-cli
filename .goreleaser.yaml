@@ -1,0 +1,354 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+version: 2
+
+project_name: banned
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    - go generate ./...
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - "386"
+      - amd64
+      - arm
+      - arm64
+    goarm:
+      - "6"
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+    main: ./main.go
+    binary: banned
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+
+archives:
+  - format: tar.gz
+    # this name template makes the OS and Arch compatible with the results of `uname`.
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+      - go mod tidy
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
+
+release:
+  # Repo in which the release will be created.
+  # Default is extracted from the origin remote URL or empty if its private hosted.
+  # Note: it can only be one: either github, gitlab or gitea
+  github:
+    owner: daniel-le97
+    name: banned-cli
+
+  # If set to true, will not auto-publish the release.
+  # Available only for GitHub and Gitea.
+  draft: false
+
+  # Whether to remove existing draft releases with the same name before creating
+  # a new one. Only effective if `draft` is set to true.
+  # Available only for GitHub.
+  replace_existing_draft: true
+
+  # Useful if you want to delay the creation of the tag in the remote.
+  # You can create the tag locally, but not push it, and run GoReleaser.
+  # It'll then set the `target_commitish` portion of the GitHub release to the
+  # value you set here.
+  # Only works on GitHub.
+  # target_commitish: "{{ .Commit }}"
+
+  # If set, will create a release discussion in the category specified.
+  #
+  # Warning: do not use categories in the 'Announcement' format.
+  #  Check https://github.com/goreleaser/goreleaser/issues/2304 for more info.
+  #
+  # Default is empty.
+  discussion_category_name: General
+
+  # Set this to true if you want to disable just the artifact upload to the SCM.
+  # If this is true, GoReleaser will still create the release with the
+  # changelog, but won't upload anything to it.
+  skip_upload: false
+
+  # You can add extra pre-existing files to the release.
+  # The filename on the release will be the last part of the path (base).
+  # If another file with the same name exists, the last one found will be used.
+  extra_files:
+    - glob: ./README.md
+    - glob: ./LICENSE
+
+brews:
+  - name: banned
+    description: "CLI tool for downloading from https://banned.video"
+    homepage: "https://github.com/daniel-le97/banned-cli"
+    license: "MIT"
+    
+    # NOTE: make sure the url_template, the token and given repo (github or 
+    # gitlab) owner and name are from the same kind.
+    # We will probably unify this in the next major version like it is 
+    # done with scoop.
+    
+    # GitHub/GitLab repository to push the formula to
+    repository:
+      owner: daniel-le97
+      name: homebrew-tap
+      # Optionally a branch can be provided.
+      # Defaults to the default repository branch.
+      branch: main
+      
+      # Optionally a token can be provided, if it differs from the token
+      # provided to GoReleaser
+      # Templates: allowed
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+    # Template for the url which is determined by the given Token (github,
+    # gitlab or gitea).
+    #
+    # Default depends on the client.
+    # Templates: allowed
+    url_template: "https://github.com/daniel-le97/banned-cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+
+    # Allows you to set a custom download strategy. Note that you'll need
+    # to implement the strategy and add it to your tap repository.
+    # Example: https://docs.brew.sh/Formula-Cookbook#specifying-the-download-strategy-explicitly
+    # Default is empty.
+    download_strategy: CurlDownloadStrategy
+
+    # Git author used to commit to the repository.
+    # Defaults are shown.
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+    # The project name and current git tag are used in the format string.
+    # Templates: allowed
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+
+    # Setting this will prevent goreleaser to actually try to commit the updated
+    # formula - instead, the formula file will be stored on the dist folder only,
+    # leaving the responsibility of publishing it to the user.
+    # If set to auto, the release will not be uploaded to the homebrew tap
+    # in case there is an indicator for prerelease in the tag e.g. v1.0.0-rc1
+    # Default is false.
+    skip_upload: false
+
+    # Custom block for brew.
+    # Can be used to specify alternate requirements.
+    # Templates: allowed
+    custom_block: |
+      head "https://github.com/daniel-le97/banned-cli.git"
+
+    # Packages your package depends on.
+    dependencies:
+      - name: git
+
+    # Packages that conflict with your package.
+    # conflicts:
+    #   - svn
+    #   - bash
+
+    # Specify for packages that run as a service.
+    # Default is empty.
+    # plist: |
+    #   <?xml version="1.0" encoding="UTF-8"?>
+    #   ...
+
+    # Custom install script for brew.
+    # Templates: allowed
+    # Default is 'bin.install "program"'.
+    install: |
+      bin.install "banned"
+
+    # Custom test script for brew.
+    # Templates: allowed
+    # Default is `system "#{bin}/program --version"`.
+    test: |
+      system "#{bin}/banned --help"
+
+scoops:
+  - name: banned
+    description: "CLI tool for downloading from https://banned.video"
+    homepage: "https://github.com/daniel-le97/banned-cli"
+    license: "MIT"
+    
+    # Repository to push the app manifest to.
+    repository:
+      owner: daniel-le97
+      name: scoop-bucket
+      branch: main
+      token: "{{ .Env.SCOOP_TAP_GITHUB_TOKEN }}"
+
+    # Git author used to commit to the repository.
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+    # The project name and current git tag are used in the format string.
+    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+
+    # Setting this will prevent goreleaser to actually try to commit the updated
+    # manifest - instead, the manifest file will be stored on the dist folder
+    # only, leaving the responsibility of publishing it to the user.
+    skip_upload: false
+
+# Docker configuration for multi-arch container images (commented out - no Dockerfile)
+# dockers:
+#   - image_templates:
+#       - "ghcr.io/daniel-le97/banned:{{ .Tag }}-amd64"
+#       - "ghcr.io/daniel-le97/banned:latest-amd64"
+#     dockerfile: Dockerfile
+#     use: buildx
+#     build_flag_templates:
+#       - "--pull"
+#       - "--label=org.opencontainers.image.created={{.Date}}"
+#       - "--label=org.opencontainers.image.title={{.ProjectName}}"
+#       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+#       - "--label=org.opencontainers.image.version={{.Version}}"
+#       - "--label=org.opencontainers.image.source=https://github.com/daniel-le97/banned-cli"
+#       - "--platform=linux/amd64"
+#     extra_files:
+#       - README.md
+#       - LICENSE
+# 
+#   - image_templates:
+#       - "ghcr.io/daniel-le97/banned:{{ .Tag }}-arm64"
+#       - "ghcr.io/daniel-le97/banned:latest-arm64"
+#     dockerfile: Dockerfile
+#     use: buildx
+#     build_flag_templates:
+#       - "--pull"
+#       - "--label=org.opencontainers.image.created={{.Date}}"
+#       - "--label=org.opencontainers.image.title={{.ProjectName}}"
+#       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+#       - "--label=org.opencontainers.image.version={{.Version}}"
+#       - "--label=org.opencontainers.image.source=https://github.com/daniel-le97/banned-cli"
+#       - "--platform=linux/arm64"
+#     goarch: arm64
+#     extra_files:
+#       - README.md
+#       - LICENSE
+# 
+# docker_manifests:
+#   - name_template: "ghcr.io/daniel-le97/banned:{{ .Tag }}"
+#     image_templates:
+#       - "ghcr.io/daniel-le97/banned:{{ .Tag }}-amd64"
+#       - "ghcr.io/daniel-le97/banned:{{ .Tag }}-arm64"
+#   - name_template: "ghcr.io/daniel-le97/banned:latest"
+#     image_templates:
+#       - "ghcr.io/daniel-le97/banned:latest-amd64"
+#       - "ghcr.io/daniel-le97/banned:latest-arm64"
+
+# snapcrafts:
+#   - name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+#     summary: CLI tool for downloading from https://banned.video
+#     description: |
+#       A comprehensive command-line tool for downloading and managing content 
+#       from banned.video with interactive TUI, database management, and torrent support.
+#     grade: stable
+#     confinement: strict
+#     publish: true
+#     license: MIT
+#     base: core20
+#     apps:
+#       banned:
+#         plugs: ["home", "network", "removable-media"]
+
+# nfpms:
+#   - file_name_template: '{{ .ConventionalFileName }}'
+#     id: packages
+#     homepage: https://github.com/daniel-le97/banned-cli
+#     description: |-
+#       A comprehensive CLI tool for downloading and managing content from banned.video
+#       with interactive TUI, database management, and torrent support.
+#     maintainer: Your Name <your.email@domain.com>
+#     license: MIT
+#     vendor: Your Organization
+#     bindir: /usr/bin
+#     section: utils
+#     contents:
+#       - src: ./README.md
+#         dst: /usr/share/doc/banned/README.md
+#       - src: ./LICENSE
+#         dst: /usr/share/doc/banned/LICENSE
+#     formats:
+#     - apk
+#     - deb
+#     - rpm
+#     - archlinux
+#     deb:
+#       lintian_overrides:
+#         - statically-linked-binary
+#         - changelog-file-missing-in-native-package
+
+publishers:
+  - name: fury.io
+    # by specifying `packages` id here goreleaser will only use this publisher
+    # with artifacts identified by this id
+    ids:
+      - packages
+    dir: "{{ dir .ArtifactPath }}"
+    cmd: curl -F package=@{{ .ArtifactName }} https://{{ .Env.FURY_TOKEN }}@push.fury.io/{{ .Env.FURY_USER }}/
+
+# The lines beneath this are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj

@@ -94,3 +94,6 @@ banned.json
 channels.json
 videos.json
 *.json.bak
+
+
+dist
