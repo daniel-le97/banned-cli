@@ -31,8 +31,8 @@ var downloadCmd = &cobra.Command{
 and fetches the file size for each video's direct URL.
 
 Example:
-  banned-cli download 5b885d33e6646a0015a6fa2d
-  banned-cli download 5b885d33e6646a0015a6fa2d --stats`,
+  banned download 5b885d33e6646a0015a6fa2d
+  banned download 5b885d33e6646a0015a6fa2d --stats`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		channelID := args[0]

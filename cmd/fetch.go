@@ -6,6 +6,11 @@ package cmd
 import (
 	"fmt"
 
+	"os"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/daniel-le97/banned-cli/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -72,17 +77,17 @@ This will:
 	},
 }
 
-// fetchChannelCmd fetches a specific channel
-var fetchChannelCmd = &cobra.Command{
-	Use:   "channel <channel-id>",
-	Short: "Fetch specific channel details and videos",
+// fetchVideosCmd fetches videos from a specific channel
+var fetchVideosCmd = &cobra.Command{
+	Use:   "videos <channel-id>",
+	Short: "Fetch videos from a specific channel",
 	Long: `Fetch detailed information about a specific channel and its videos from banned.video API.
 
 By default, fetches the first 50 videos. Use --all flag to recursively fetch ALL videos.
 
 Examples:
-  banned fetch channel 5b885d33e6646a0015a6fa2d           # Fetch channel + first 50 videos
-  banned fetch channel 5b885d33e6646a0015a6fa2d --all     # Fetch channel + ALL videos recursively`,
+  banned fetch videos 5b885d33e6646a0015a6fa2d           # Fetch channel + first 50 videos
+  banned fetch videos 5b885d33e6646a0015a6fa2d --all     # Fetch channel + ALL videos recursively`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		channelID := args[0]
@@ -183,12 +188,110 @@ Features:
 	},
 }
 
+// syncFileSizesCmd fetches file sizes for videos that don't have them
+var fetchFileSizesCmd = &cobra.Command{
+	Use:   "file-sizes [channel-id]",
+	Short: "Fetch file sizes for videos missing size data",
+	Long: `
+	Fetch file sizes for videos that don't have file size data in the database.
+
+This command will:
+- Find all videos with missing file sizes (file_size = 0 or NULL)  
+- Optionally filter by channel ID
+- Fetch file sizes concurrently with rate limiting
+- Update the database with the results
+
+Examples:
+  banned fetch file-sizes                           # Update all videos missing file sizes
+  banned fetch file-sizes 5b885d33e6646a0015a6fa2d  # Update specific channels videos`,
+
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		var channelID string
+		if len(args) > 0 {
+			channelID = args[0]
+		}
+
+		db, err := GetDB()
+		if err != nil {
+			fmt.Printf("❌ Could not connect to database: %v\n", err)
+			return
+		}
+
+		// Build query to find videos without file sizes
+		var query string
+		var queryArgs []interface{}
+
+		if channelID != "" {
+			query = `SELECT id, direct_url FROM videos WHERE channel_id = ? AND (file_size = 0 OR file_size IS NULL) AND direct_url != ''`
+			queryArgs = []interface{}{channelID}
+			fmt.Printf("🔍 Finding videos without file sizes for channel %s...\n", channelID)
+		} else {
+			query = `SELECT id, direct_url FROM videos WHERE (file_size = 0 OR file_size IS NULL) AND direct_url != ''`
+			fmt.Printf("🔍 Finding all videos without file sizes...\n")
+		}
+
+		rows, err := db.Query(query, queryArgs...)
+		if err != nil {
+			fmt.Printf("❌ Failed to query videos: %v\n", err)
+			return
+		}
+		defer rows.Close()
+
+		var videos []Video
+		for rows.Next() {
+			var video Video
+			if err := rows.Scan(&video.ID, &video.DirectURL); err != nil {
+				fmt.Printf("⚠️  Warning: failed to scan video: %v\n", err)
+				continue
+			}
+			videos = append(videos, video)
+		}
+
+		if len(videos) == 0 {
+			fmt.Printf("✅ All videos already have file sizes!\n")
+			return
+		}
+
+		var pkgs []string
+		for _, v := range videos {
+			pkgs = append(pkgs, v.DirectURL)
+		}
+
+		fmt.Printf("📏 Found %d videos without file sizes. Starting fetch...\n", len(videos))
+		if _, err := tea.NewProgram(tui.NewPackageManagerModel("fetch", pkgs, fetchFunc)).Run(); err != nil {
+			fmt.Println("Error running program:", err)
+			os.Exit(1)
+		}
+		// fetchVideoFileSizes(videos)
+		fmt.Printf("✅ File size fetching completed!\n")
+	},
+}
+
+func fetchFunc(pkg string) tea.Cmd {
+	returnFunc := func() tea.Msg {
+		return tui.InstalledPkgMsg(pkg)
+	}
+	size, err := getFileSize(pkg)
+	if err != nil {
+		return returnFunc
+	}
+	db, err := GetDB()
+	if err != nil {
+		time.Sleep(500 * time.Millisecond)
+		fetchFunc(pkg)
+	}
+	db.Exec("UPDATE videos SET file_size = ? WHERE direct_url = ?", size, pkg)
+	return returnFunc
+}
+
 func init() {
 	rootCmd.AddCommand(fetchCmd)
-	fetchCmd.AddCommand(fetchChannelsCmd)
-	fetchCmd.AddCommand(fetchChannelCmd)
 	rootCmd.AddCommand(listChannelsCmd)
+	fetchCmd.AddCommand(fetchChannelsCmd)
+	fetchCmd.AddCommand(fetchVideosCmd)
+	fetchCmd.AddCommand(fetchFileSizesCmd)
 
 	// Add flags for fetch channel command
-	fetchChannelCmd.Flags().BoolP("all", "a", false, "Fetch ALL videos recursively (may take time for channels with many videos)")
+	fetchVideosCmd.Flags().BoolP("all", "a", false, "Fetch ALL videos recursively (may take time for channels with many videos)")
 }

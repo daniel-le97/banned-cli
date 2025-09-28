@@ -34,8 +34,8 @@ var DefaultTrackers = []string{
 }
 
 var (
-	// AppName is derived from the module name (part after last /)
-	AppName = getAppNameFromModule(DefaultModulePath)
+	// AppName is the application name (binary name)
+	AppName = "banned"
 
 	// ConfigFileName is the default config file name (without extension)
 	ConfigFileName = "." + AppName

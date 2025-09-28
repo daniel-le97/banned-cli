@@ -10,7 +10,7 @@ import (
 
 	// "math/rand"
 	"net/http"
-	"os"
+	// "os"
 
 	// "strings"
 	"sync"
@@ -18,8 +18,8 @@ import (
 
 	// "github.com/charmbracelet/bubbles/progress"
 	// "github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/daniel-le97/banned-cli/tui"
+	// tea "github.com/charmbracelet/bubbletea"
+	// "github.com/daniel-le97/banned-cli/tui"
 
 	// "github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -619,110 +619,13 @@ func CheckChannelVideoCount(channelID string) (apiCount, dbCount int, needsSync 
 	return apiCount, dbCount, needsSync, nil
 }
 
-// syncFileSizesCmd fetches file sizes for videos that don't have them
-var syncFileSizesCmd = &cobra.Command{
-	Use:   "file-sizes [channel-id]",
-	Short: "Fetch file sizes for videos missing size data",
-	Long: `
-	Fetch file sizes for videos that don't have file size data in the database.
-
-This command will:
-- Find all videos with missing file sizes (file_size = 0 or NULL)  
-- Optionally filter by channel ID
-- Fetch file sizes concurrently with rate limiting
-- Update the database with the results
-
-Examples:
-  banned sync file-sizes                           # Update all videos missing file sizes
-  banned sync file-sizes 5b885d33e6646a0015a6fa2d  # Update specific channels videos`,
-
-	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		var channelID string
-		if len(args) > 0 {
-			channelID = args[0]
-		}
-
-		db, err := GetDB()
-		if err != nil {
-			fmt.Printf("❌ Could not connect to database: %v\n", err)
-			return
-		}
-
-		// Build query to find videos without file sizes
-		var query string
-		var queryArgs []interface{}
-
-		if channelID != "" {
-			query = `SELECT id, direct_url FROM videos WHERE channel_id = ? AND (file_size = 0 OR file_size IS NULL) AND direct_url != ''`
-			queryArgs = []interface{}{channelID}
-			fmt.Printf("🔍 Finding videos without file sizes for channel %s...\n", channelID)
-		} else {
-			query = `SELECT id, direct_url FROM videos WHERE (file_size = 0 OR file_size IS NULL) AND direct_url != ''`
-			fmt.Printf("🔍 Finding all videos without file sizes...\n")
-		}
-
-		rows, err := db.Query(query, queryArgs...)
-		if err != nil {
-			fmt.Printf("❌ Failed to query videos: %v\n", err)
-			return
-		}
-		defer rows.Close()
-
-		var videos []Video
-		for rows.Next() {
-			var video Video
-			if err := rows.Scan(&video.ID, &video.DirectURL); err != nil {
-				fmt.Printf("⚠️  Warning: failed to scan video: %v\n", err)
-				continue
-			}
-			videos = append(videos, video)
-		}
-
-		if len(videos) == 0 {
-			fmt.Printf("✅ All videos already have file sizes!\n")
-			return
-		}
-
-		var pkgs []string
-		for _, v := range videos {
-			pkgs = append(pkgs, v.DirectURL)
-		}
-
-		fmt.Printf("📏 Found %d videos without file sizes. Starting fetch...\n", len(videos))
-		if _, err := tea.NewProgram(tui.NewPackageManagerModel("fetch", pkgs, fetchFunc)).Run(); err != nil {
-			fmt.Println("Error running program:", err)
-			os.Exit(1)
-		}
-		// fetchVideoFileSizes(videos)
-		fmt.Printf("✅ File size fetching completed!\n")
-	},
-}
-
-func fetchFunc(pkg string) tea.Cmd {
-	returnFunc := func() tea.Msg {
-		return tui.InstalledPkgMsg(pkg)
-	}
-	size, err := getFileSize(pkg)
-	if err != nil {
-		return returnFunc
-	}
-	db, err := GetDB()
-	if err != nil {
-		time.Sleep(500 * time.Millisecond)
-		fetchFunc(pkg)
-	}
-	db.Exec("UPDATE videos SET file_size = ? WHERE direct_url = ?", size, pkg)
-	return returnFunc
-}
-
 func init() {
 	rootCmd.AddCommand(syncCmd)
 	syncCmd.AddCommand(syncChannelsCmd)
 	syncCmd.AddCommand(syncChannelCmd)
 	syncCmd.AddCommand(syncCheckCmd)
 	syncCmd.AddCommand(syncAllCmd)
-	syncCmd.AddCommand(syncFileSizesCmd)
+	// syncCmd.AddCommand(syncFileSizesCmd)
 
 	// Add flags
 	syncChannelCmd.Flags().BoolP("skip-file-sizes", "s", false, "Skip fetching file sizes for new videos")
