@@ -157,11 +157,11 @@ release:
   # The filename on the release will be the last part of the path (base).
   # If another file with the same name exists, the last one found will be used.
   extra_files:
-    - glob: ./README.md
-    - glob: ./LICENSE
-    - glob: ./install.sh
-    - glob: ./install.ps1
-    - glob: ./install.bat
+    # - glob: ./README.md
+    # - glob: ./LICENSE
+    - glob: ./scripts/install.sh
+    - glob: ./scripts/install.ps1
+    - glob: ./scripts/install.bat
     - glob: ./banned.db
 
 
