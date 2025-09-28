@@ -690,7 +690,7 @@ Examples:
 		}
 
 		fmt.Printf("📏 Found %d videos without file sizes. Starting fetch...\n", len(videos))
-		if _, err := tea.NewProgram(tui.NewModel("fetch", pkgs, fetchFunc)).Run(); err != nil {
+		if _, err := tea.NewProgram(tui.NewPackageManagerModel("fetch", pkgs, fetchFunc)).Run(); err != nil {
 			fmt.Println("Error running program:", err)
 			os.Exit(1)
 		}

@@ -43,7 +43,7 @@ var (
 	checkMark           = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).SetString("✓")
 )
 
-func NewModel(word string, packages []string, InstallFunc func(string) tea.Cmd) model {
+func NewPackageManagerModel(word string, packages []string, InstallFunc func(string) tea.Cmd) model {
 	p := progress.New(
 		progress.WithDefaultGradient(),
 		progress.WithWidth(40),
