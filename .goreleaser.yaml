@@ -160,6 +160,8 @@ release:
     - glob: ./README.md
     - glob: ./LICENSE
     - glob: ./install.sh
+    - glob: ./install.ps1
+    - glob: ./install.bat
     - glob: ./banned.db
 
 

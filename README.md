@@ -14,7 +14,24 @@ A comprehensive command-line tool for downloading and managing content from http
 
 ## 📦 Installation
 
-### Quick Install
+### One-Line Install (Recommended)
+
+**Linux/macOS:**
+```bash
+curl -sSL https://github.com/daniel-le97/banned-cli/releases/latest/download/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+iwr -useb https://github.com/daniel-le97/banned-cli/releases/latest/download/install.ps1 | iex
+```
+
+### Manual Download
+
+Download the latest release for your platform from:
+[GitHub Releases](https://github.com/daniel-le97/banned-cli/releases/latest)
+
+### From Go
 
 ```bash
 go install libertyarchive.com/banned@latest
@@ -23,22 +40,9 @@ go install libertyarchive.com/banned@latest
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/cli-aj
-cd cli-aj
+git clone https://github.com/daniel-le97/banned-cli
+cd banned-cli
 go build -o banned .
-```
-
-### Install to PATH
-
-```bash
-# Interactive installation
-./banned app install
-
-# Symlink method
-./banned app install --symlink
-
-# Shell profile method
-./banned app install --profile
 ```
 
 ## 🎯 Quick Start
