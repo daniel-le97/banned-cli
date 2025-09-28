@@ -191,7 +191,7 @@ func insertDefaultSettings() error {
 		"download_directory": "~/Downloads/banned/",
 		"last_sync":          "2023-01-01T00:00:00Z",
 		"api_endpoint":       "https://api.banned.video/graphql",
-		"user_agent":         "banned/1.0",
+		"user_agent":         "banned-cli/1.0",
 	}
 
 	// Insert settings only if they don't exist

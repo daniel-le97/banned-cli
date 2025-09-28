@@ -318,6 +318,39 @@ The application uses SQLite with the following tables:
 
 ## ⚙️ Configuration
 
+### Managing Settings
+
+Use the `config` command to manage application settings:
+
+```bash
+# List all current settings
+banned config list
+
+# Set download directory
+banned config set download_dir ~/Videos/banned
+
+# Set torrent trackers
+banned config set torrent_trackers "udp://tracker1.com:80/announce,udp://tracker2.com:80/announce"
+
+# Set max concurrent downloads
+banned config set max_concurrent_downloads 5
+
+# Get current download directory
+banned config get download_dir
+
+# Reset a setting to default
+banned config reset download_dir
+```
+
+### Available Settings
+
+- **download_dir**: Directory where downloaded files are saved
+- **max_concurrent_downloads**: Maximum concurrent downloads (1-10)
+- **retry_attempts**: Number of retry attempts for failed downloads (0-10)
+- **user_agent**: User agent string for HTTP requests
+- **torrent_trackers**: Comma-separated list of torrent tracker URLs
+- **torrent_piece_length**: Torrent piece length in KB (64-1024)
+
 ### Database Location
 
 - **Linux/macOS**: `~/.local/share/banned/banned.db`
@@ -328,7 +361,7 @@ The application uses SQLite with the following tables:
 
 - Download Directory: `~/Downloads/banned/`
 - API Endpoint: `https://api.banned.video/graphql`
-- User Agent: `banned/1.0`
+- User Agent: `banned-cli/1.0`
 - Torrent Piece Length: 256KB
 - Default Trackers: Multiple public BitTorrent trackers
 

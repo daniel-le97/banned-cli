@@ -4,7 +4,10 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"os"
 	"path"
+	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -40,6 +43,68 @@ var (
 	// ConfigFileName is the default config file name (without extension)
 	ConfigFileName = "." + AppName
 )
+
+// GetConfigValue retrieves a configuration value with fallback to default
+func GetConfigValue(key, defaultValue string) string {
+	value, err := GetSetting(key)
+	if err != nil || value == "" {
+		return defaultValue
+	}
+	return value
+}
+
+// GetDownloadDir returns the configured download directory or default
+func GetDownloadDir() string {
+	homeDir, _ := os.UserHomeDir()
+	defaultDir := filepath.Join(homeDir, "Downloads", "banned")
+	return GetConfigValue("download_dir", defaultDir)
+}
+
+// GetTorrentTrackers returns the configured trackers as a slice
+func GetTorrentTrackers() []string {
+	defaultTrackers := strings.Join(DefaultTrackers, ",")
+	trackersStr := GetConfigValue("torrent_trackers", defaultTrackers)
+
+	var trackers []string
+	for _, tracker := range strings.Split(trackersStr, ",") {
+		if tracker = strings.TrimSpace(tracker); tracker != "" {
+			trackers = append(trackers, tracker)
+		}
+	}
+	return trackers
+}
+
+// GetMaxConcurrentDownloads returns the configured max concurrent downloads
+func GetMaxConcurrentDownloads() int {
+	valueStr := GetConfigValue("max_concurrent_downloads", "3")
+	if value, err := strconv.Atoi(valueStr); err == nil && value > 0 {
+		return value
+	}
+	return 3
+}
+
+// GetRetryAttempts returns the configured retry attempts
+func GetRetryAttempts() int {
+	valueStr := GetConfigValue("retry_attempts", "3")
+	if value, err := strconv.Atoi(valueStr); err == nil && value >= 0 {
+		return value
+	}
+	return 3
+}
+
+// GetUserAgent returns the configured user agent
+func GetUserAgent() string {
+	return GetConfigValue("user_agent", "banned-cli/1.0")
+}
+
+// GetTorrentPieceLength returns the configured piece length in KB
+func GetTorrentPieceLength() int {
+	valueStr := GetConfigValue("torrent_piece_length", strconv.Itoa(DefaultPieceLength))
+	if value, err := strconv.Atoi(valueStr); err == nil && value > 0 {
+		return value
+	}
+	return DefaultPieceLength
+}
 
 // getAppNameFromModule extracts the application name from the module path
 func getAppNameFromModule(modulePath string) string {
