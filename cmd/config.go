@@ -11,7 +11,7 @@ import (
 // Application configuration - change these values to customize the application
 const (
 	// DefaultModulePath is the Go module path for updates (when published)
-	DefaultModulePath = "libertyarchive.com/banned"
+	DefaultModulePath = "github.com/daniel-le97/banned-cli"
 	APIEndpoint	   = "https://api.banned.video/graphql"
 
 	// AppDescription is the short description shown in help

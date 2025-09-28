@@ -57,10 +57,10 @@ builds:
     binary: banned
     ldflags:
       - -s -w
-      - -X libertyarchive.com/banned/cmd.version={{.Version}}
-      - -X libertyarchive.com/banned/cmd.commit={{.Commit}}
-      - -X libertyarchive.com/banned/cmd.date={{.Date}}
-      - -X libertyarchive.com/banned/cmd.builtBy=goreleaser
+      - -X github.com/daniel-le97/banned-cli/cmd.version={{.Version}}
+      - -X github.com/daniel-le97/banned-cli/cmd.commit={{.Commit}}
+      - -X github.com/daniel-le97/banned-cli/cmd.date={{.Date}}
+      - -X github.com/daniel-le97/banned-cli/cmd.builtBy=goreleaser
 
 archives:
   - format: tar.gz

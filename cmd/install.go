@@ -1,10 +1,11 @@
 /*
 Copyright © 2025 NAME ExaExamples:
-  %s install           # Install using symlink method
-  %s install --profile # Force install by modifying shell profile", AppName, AppName),es:
 
-	%s app install           # Install using symlink method
-	%s app install --profile # Force install by modifying shell profile", AppName, AppName, AppName),E <EMAIL ADDRESS>
+	  %s install           # Install using symlink method
+	  %s install --profile # Force install by modifying shell profile", AppName, AppName),es:
+
+		%s app install           # Install using symlink method
+		%s app install --profile # Force install by modifying shell profile", AppName, AppName, AppName),E <EMAIL ADDRESS>
 */
 package cmd
 

@@ -19,7 +19,7 @@ import (
 	// "github.com/charmbracelet/bubbles/progress"
 	// "github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"libertyarchive.com/banned/tui"
+	"github.com/daniel-le97/banned-cli/tui"
 
 	// "github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"

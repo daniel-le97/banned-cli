@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"libertyarchive.com/banned/cmd"
+	"github.com/daniel-le97/banned-cli/cmd"
 )
 
 func testDatabase() {

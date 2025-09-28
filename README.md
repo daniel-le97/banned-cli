@@ -36,7 +36,7 @@ Download the latest release for your platform from:
 ### From Go
 
 ```bash
-go install libertyarchive.com/banned@latest
+go install github.com/daniel-le97/banned-cli@latest
 ```
 
 ### From Source

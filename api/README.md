@@ -23,7 +23,7 @@ import (
     "fmt"
     "log"
 
-    "libertyarchive.com/banned/api"
+    "github.com/daniel-le97/banned-cli/api"
 )
 
 func main() {

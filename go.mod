@@ -1,4 +1,4 @@
-module libertyarchive.com/banned
+module github.com/daniel-le97/banned-cli
 
 go 1.25.1
 

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"libertyarchive.com/banned/api"
+	"github.com/daniel-le97/banned-cli/api"
 )
 
 func TestNewAPI(t *testing.T) {
