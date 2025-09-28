@@ -1,5 +1,7 @@
 /*
-Copyright © 2025 NAME Examples:
+Copyright © 2025 NAME ExaExamples:
+  %s install           # Install using symlink method
+  %s install --profile # Force install by modifying shell profile", AppName, AppName),es:
 
 	%s app install           # Install using symlink method
 	%s app install --profile # Force install by modifying shell profile", AppName, AppName, AppName),E <EMAIL ADDRESS>
@@ -27,8 +29,8 @@ The install command will:
 2. If that fails, it will add the binary location to your shell's profile (.bashrc, .zshrc, etc.)
 
 Examples:
-  %s app install           # Install using symlink method
-  %s app install --profile # Force install by modifying shell profile`, AppName, AppName, AppName),
+  %s install           # Install using symlink method
+  %s install --profile # Force install by modifying shell profile`, AppName, AppName, AppName),
 	Run: func(cmd *cobra.Command, args []string) {
 		forceProfile, _ := cmd.Flags().GetBool("profile")
 
@@ -261,7 +263,7 @@ func isDirectoryInPath(dir string) bool {
 }
 
 func init() {
-	appCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(installCmd)
 
 	// Add flags for the install command
 	installCmd.Flags().BoolP("profile", "p", false, "Force installation by modifying shell profile instead of creating symlink")
