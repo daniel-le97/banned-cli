@@ -139,15 +139,15 @@ func TestVideoHelperMethods(t *testing.T) {
 		ID:    "test-video",
 		Title: "Test Video",
 		VideoUpload: &api.Upload{
-			Name:    "video.mp4",
+			Name:     "video.mp4",
 			Encoding: "video.mp4",
 		},
 		PosterUpload: &api.Upload{
-			Name:    "poster.jpg",
+			Name:     "poster.jpg",
 			Encoding: "poster.jpg",
 		},
 		AudioUpload: &api.Upload{
-			Name:    "audio.mp3",
+			Name:     "audio.mp3",
 			Encoding: "audio.mp3",
 		},
 		LargeImage: "https://example.com/large.jpg",

@@ -12,7 +12,7 @@ import (
 const (
 	// DefaultModulePath is the Go module path for updates (when published)
 	DefaultModulePath = "github.com/daniel-le97/banned-cli"
-	APIEndpoint	   = "https://api.banned.video/graphql"
+	APIEndpoint       = "https://api.banned.video/graphql"
 
 	// AppDescription is the short description shown in help
 	AppDescription = "tool for downloading from https://banned.video"
