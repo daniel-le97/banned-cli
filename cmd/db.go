@@ -6,6 +6,7 @@ package cmd
 import (
 	"fmt"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -124,6 +125,39 @@ var dbSettingsCmd = &cobra.Command{
 	},
 }
 
+// dbViewCmd shows database tables in an interactive TUI
+var dbViewCmd = &cobra.Command{
+	Use:   "view",
+	Short: "Interactive database table viewer",
+	Long: `View database tables and records in an interactive Bubble Tea interface.
+
+Navigation:
+  ←/→ or Tab - Switch between tables
+  ↑/↓        - Navigate rows  
+  q          - Quit
+
+Tables available: Downloads, Settings, Channels, Videos`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("🔗 Connecting to database...")
+		db, err := GetDB()
+		if err != nil {
+			fmt.Printf("❌ Failed to connect to database: %v\n", err)
+			return
+		}
+
+		fmt.Println("📊 Starting database viewer...")
+		fmt.Println("💡 Use ←/→ or Tab to switch tables, ↑/↓ to navigate, 'q' to quit")
+
+		model := newDatabaseViewModel(db)
+		p := tea.NewProgram(model, tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("❌ Error running database viewer: %v\n", err)
+		}
+
+		fmt.Println("👋 Database viewer closed")
+	},
+}
+
 func getDatabaseLocationSafe() string {
 	path, err := getDatabasePath()
 	if err != nil {
@@ -137,4 +171,5 @@ func init() {
 	dbCmd.AddCommand(dbInitCmd)
 	dbCmd.AddCommand(dbStatusCmd)
 	dbCmd.AddCommand(dbSettingsCmd)
+	dbCmd.AddCommand(dbViewCmd)
 }
