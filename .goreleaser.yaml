@@ -81,7 +81,7 @@ archives:
       - README.md
       - LICENSE
       - banned.db     # Include SQLite database with releases
-      - ./scripts/install.sh    # Include installer script
+      # - ./scripts/install.sh    # Include installer script
 
 checksum:
   name_template: 'checksums.txt'
