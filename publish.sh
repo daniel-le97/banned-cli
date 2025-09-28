@@ -154,7 +154,7 @@ update_version_files() {
     # Update version in main.go or cmd/version.go if they exist
     if [ -f "cmd/version.go" ]; then
         info "Updating version in cmd/version.go"
-        sed -i "s/Version = \".*\"/Version = \"$new_version\"/" cmd/version.go
+        sed -i "s/version = \".*\"/version = \"$new_version\"/" cmd/version.go
     fi
     
     # You can add more files here if needed
