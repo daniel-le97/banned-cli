@@ -7,17 +7,21 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+
+	// "math/rand"
 	"net/http"
 	"os"
-	"strings"
+
+	// "strings"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
+	// "github.com/charmbracelet/bubbles/progress"
+	// "github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"libertyarchive.com/banned/tui"
+
+	// "github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 	// "libertyarchive.com/banned/tui"
 )
@@ -619,7 +623,8 @@ func CheckChannelVideoCount(channelID string) (apiCount, dbCount int, needsSync 
 var syncFileSizesCmd = &cobra.Command{
 	Use:   "file-sizes [channel-id]",
 	Short: "Fetch file sizes for videos missing size data",
-	Long: `Fetch file sizes for videos that don't have file size data in the database.
+	Long: `
+	Fetch file sizes for videos that don't have file size data in the database.
 
 This command will:
 - Find all videos with missing file sizes (file_size = 0 or NULL)  
@@ -629,7 +634,8 @@ This command will:
 
 Examples:
   banned sync file-sizes                           # Update all videos missing file sizes
-  banned sync file-sizes 5b885d33e6646a0015a6fa2d  # Update specific channel's videos`,
+  banned sync file-sizes 5b885d33e6646a0015a6fa2d  # Update specific channels videos`,
+
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var channelID string
@@ -678,8 +684,13 @@ Examples:
 			return
 		}
 
+		var pkgs []string
+		for _, v := range videos {
+			pkgs = append(pkgs, v.DirectURL)
+		}
+
 		fmt.Printf("📏 Found %d videos without file sizes. Starting fetch...\n", len(videos))
-		if _, err := tea.NewProgram(newModel(videos)).Run(); err != nil {
+		if _, err := tea.NewProgram(tui.NewModel("fetch", pkgs, fetchFunc)).Run(); err != nil {
 			fmt.Println("Error running program:", err)
 			os.Exit(1)
 		}
@@ -688,128 +699,21 @@ Examples:
 	},
 }
 
-type model struct {
-	packages []Video
-	index    int
-	width    int
-	height   int
-	spinner  spinner.Model
-	progress progress.Model
-	done     bool
-}
-
-var (
-	currentPkgNameStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("211"))
-	doneStyle           = lipgloss.NewStyle().Margin(1, 2)
-	checkMark           = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).SetString("✓")
-)
-
-func newModel(vids []Video) model {
-	p := progress.New(
-		progress.WithDefaultGradient(),
-		progress.WithWidth(40),
-		progress.WithoutPercentage(),
-	)
-	s := spinner.New()
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-	return model{
-		packages: vids,
-		spinner:  s,
-		progress: p,
+func fetchFunc(pkg string) tea.Cmd {
+	returnFunc := func() tea.Msg {
+		return tui.InstalledPkgMsg(pkg)
 	}
-}
-
-func (m model) Init() tea.Cmd {
-	return tea.Batch(downloadAndInstall(m.packages[m.index]), m.spinner.Tick)
-}
-
-func getPackages() []string {
-	return []string{"package1", "package2", "package3"}
-}
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "esc", "q":
-			return m, tea.Quit
-		}
-	case installedPkgMsg:
-		pkg := m.packages[m.index]
-		if m.index >= len(m.packages)-1 {
-			// Everything's been installed. We're done!
-			m.done = true
-			return m, tea.Sequence(
-				tea.Printf("%s %s", checkMark, pkg), // print the last success message
-				tea.Quit,                            // exit the program
-			)
-		}
-
-		// Update progress bar
-		m.index++
-		progressCmd := m.progress.SetPercent(float64(m.index) / float64(len(m.packages)))
-
-		return m, tea.Batch(
-			progressCmd,
-			tea.Printf("%s %s", checkMark, pkg.DirectURL),     // print success message above our program
-			downloadAndInstall(m.packages[m.index]), // download the next package
-		)
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
-	case progress.FrameMsg:
-		newModel, cmd := m.progress.Update(msg)
-		if newModel, ok := newModel.(progress.Model); ok {
-			m.progress = newModel
-		}
-		return m, cmd
+	size, err := getFileSize(pkg)
+	if err != nil {
+		return returnFunc
 	}
-	return m, nil
-}
-
-func (m model) View() string {
-	n := len(m.packages)
-	w := lipgloss.Width(fmt.Sprintf("%d", n))
-
-	if m.done {
-		return doneStyle.Render(fmt.Sprintf("Done! Installed %d packages.\n", n))
+	db, err := GetDB()
+	if err != nil {
+		time.Sleep(500 * time.Millisecond)
+		fetchFunc(pkg)
 	}
-
-	pkgCount := fmt.Sprintf(" %*d/%*d", w, m.index, w, n)
-
-	spin := m.spinner.View() + " "
-	prog := m.progress.View()
-	cellsAvail := max(0, m.width-lipgloss.Width(spin+prog+pkgCount))
-
-	pkgName := currentPkgNameStyle.Render(m.packages[m.index].DirectURL)
-	info := lipgloss.NewStyle().MaxWidth(cellsAvail).Render("Installing " + pkgName)
-
-	cellsRemaining := max(0, m.width-lipgloss.Width(spin+info+prog+pkgCount))
-	gap := strings.Repeat(" ", cellsRemaining)
-
-	return spin + info + gap + prog + pkgCount
-}
-
-type installedPkgMsg string
-
-func downloadAndInstall(vid Video) tea.Cmd {
-	fetchVideoFileSizes([]Video{vid})
-	// This is where you'd do i/o stuff to download and install packages. In
-	// our case we're just pausing for a moment to simulate the process.
-	d := time.Millisecond * time.Duration(rand.Intn(500)) //nolint:gosec
-	return tea.Tick(d, func(t time.Time) tea.Msg {
-		return installedPkgMsg(vid.DirectURL)
-	})
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
+	db.Exec("UPDATE videos SET file_size = ? WHERE direct_url = ?", size, pkg)
+	return returnFunc
 }
 
 func init() {

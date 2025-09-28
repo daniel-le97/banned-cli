@@ -1,24 +1,40 @@
 package tui
 
 import (
-	lipgloss "github.com/charmbracelet/lipgloss"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/bubbles/progress"
-	"github.com/charmbracelet/bubbles/spinner"
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
+	lipgloss "github.com/charmbracelet/lipgloss"
 )
+
+type skrrt struct {
+	packages      []string
+	retryPackages []string
+	word          string
+	install       func(string) tea.Cmd
+	index         int
+	width         int
+	height        int
+	spinner       spinner.Model
+	progress      progress.Model
+	done          bool
+	onError 	 func(error)
+	onSuccess	 func(string)
+}
 type model struct {
-	packages []string
-	word     string
-	install  func(string) tea.Cmd
-	index    int
-	width    int
-	height   int
-	spinner  spinner.Model
-	progress progress.Model
-	done     bool
+	packages      []string
+	retryPackages []string
+	word          string
+	install       func(string) tea.Cmd
+	index         int
+	width         int
+	height        int
+	spinner       spinner.Model
+	progress      progress.Model
+	done          bool
 }
 
 var (
@@ -27,7 +43,7 @@ var (
 	checkMark           = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).SetString("✓")
 )
 
-func NewModel(word string,packages []string, InstallFunc func(string) tea.Cmd) model {
+func NewModel(word string, packages []string, InstallFunc func(string) tea.Cmd) model {
 	p := progress.New(
 		progress.WithDefaultGradient(),
 		progress.WithWidth(40),
@@ -46,10 +62,6 @@ func NewModel(word string,packages []string, InstallFunc func(string) tea.Cmd) m
 
 func (m model) Init() tea.Cmd {
 	return tea.Batch(m.install(m.packages[m.index]), m.spinner.Tick)
-}
-
-func getPackages() []string {
-	return []string{"package1", "package2", "package3"}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -71,16 +83,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				tea.Quit,                            // exit the program
 			)
 		}
-
 		// Update progress bar
 		m.index++
 		progressCmd := m.progress.SetPercent(float64(m.index) / float64(len(m.packages)))
 
 		return m, tea.Batch(
 			progressCmd,
-			tea.Printf("%s %s", checkMark, pkg),     // print success message above our program
-			m.install(m.packages[m.index]), // download the next package
+			tea.Printf("%s %s", checkMark, pkg), // print success message above our program
+			m.install(m.packages[m.index]),      // download the next package
 		)
+	case errMsg:
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
@@ -100,7 +112,7 @@ func (m model) View() string {
 	w := lipgloss.Width(fmt.Sprintf("%d", n))
 
 	if m.done {
-		return doneStyle.Render(fmt.Sprintf("Done! %ded %d packages.\n", m.word, n))
+		return doneStyle.Render(fmt.Sprintf("Done! %sed %d videos.\n", m.word, n))
 	}
 
 	pkgCount := fmt.Sprintf(" %*d/%*d", w, m.index, w, n)
@@ -110,7 +122,7 @@ func (m model) View() string {
 	cellsAvail := max(0, m.width-lipgloss.Width(spin+prog+pkgCount))
 
 	pkgName := currentPkgNameStyle.Render(m.packages[m.index])
-	info := lipgloss.NewStyle().MaxWidth(cellsAvail).Render(fmt.Sprintf("%ding ", m.word) + pkgName)
+	info := lipgloss.NewStyle().MaxWidth(cellsAvail).Render(fmt.Sprintf("%s ing ", m.word) + pkgName)
 
 	cellsRemaining := max(0, m.width-lipgloss.Width(spin+info+prog+pkgCount))
 	gap := strings.Repeat(" ", cellsRemaining)
@@ -120,16 +132,13 @@ func (m model) View() string {
 
 type InstalledPkgMsg string
 
-// func downloadAndInstall(pkg string) tea.Cmd {
-// 	fetchVideoFileSizes([]Video{vid})
-// 	// This is where you'd do i/o stuff to download and install packages. In
-// 	// our case we're just pausing for a moment to simulate the process.
-// 	d := time.Millisecond * time.Duration(rand.Intn(500)) //nolint:gosec
-// 	tea.
-// 	return tea.Tick(d, func(t time.Time) tea.Msg {
-// 		return installedPkgMsg(pkg)
-// 	})
-// }
+type errMsg struct{ err error }
+
+type error interface {
+	Error() string
+}
+
+func (e errMsg) Error() string { return e.err.Error() }
 
 func max(a, b int) int {
 	if a > b {

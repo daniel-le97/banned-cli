@@ -1,15 +1,15 @@
 {
   "data": {
     "getChannel": {
-      "_id": "605f5b3039cc2966253190ee",
-      "title": "The Roger Stone Zone",
-      "summary": "The most inflential conservative political and campaign operative alive today",
-      "avatar": "https://download.assets.video/images/c3b2f08f-2a93-4a4c-b323-85b93e936f7e-large.jpg",
-      "coverImage": "https://download.assets.video/images/4c709810-a67c-44e4-898d-1a02f2e32f14-large.jpeg",
-      "totalVideos": 367,
+      "_id": "65d4e94b0d63da299e20d401",
+      "title": "INFO SKITS",
+      "summary": "The lighter side of the Infowar. Powerful comedy to educate and elighten. ",
+      "avatar": "https://download.assets.video/images/841bc74f-4214-4ba5-9b0e-78e004bde76d-large.png",
+      "coverImage": "https://download.assets.video/images/f2f0cbe8-4ae7-4338-9fab-8b06693fa5d8-large.jpg",
+      "totalVideos": 17,
       "videos": [
         {
-          "_id": "689e423785d2b7bb0ac99b97",
+          "_id": "6610295cf84009538741a87d",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -18,7 +18,7 @@
           "directUrl": ""
         },
         {
-          "_id": "68884e07b53cace94995363f",
+          "_id": "65f8f659961a509804ac5a64",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -27,7 +27,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67b53dd89ed4927e5a370620",
+          "_id": "65ea53d033765d69399c84ba",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -36,7 +36,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67aeb09eb44bf7e36f7ed029",
+          "_id": "65ea207033765d6939961b31",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -45,7 +45,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67ad495139e29e93150dec1c",
+          "_id": "65dce40d5cb0cf8980b41af2",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -54,7 +54,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67ac052224d0d021af2ecc00",
+          "_id": "65dccbc75cb0cf8980b40339",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -63,7 +63,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67abbadc83ecfcb070f8e0b2",
+          "_id": "65d8e062e2affd7a7323344a",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -72,7 +72,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67a7f096557c9ab2de4919c5",
+          "_id": "65d8ddece2affd7a73232a28",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -81,7 +81,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67a635308b139aa6b5ce3e3b",
+          "_id": "65d8d96ae2affd7a73232952",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -90,7 +90,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67a59171a8f17ae9415ee43a",
+          "_id": "65d8d78be2affd7a732328fe",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -99,7 +99,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67a4fc2113b3e029a3b51cc2",
+          "_id": "65d7f0e3e2affd7a7322355f",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -108,7 +108,7 @@
           "directUrl": ""
         },
         {
-          "_id": "67a39f96a51babb812ac5bf0",
+          "_id": "65d7ef20e2affd7a73220578",
           "title": "",
           "summary": "",
           "largeImage": "",
