@@ -62,7 +62,8 @@ archives:
     files:
       - README.md
       - LICENSE
-      - database.db  # Include SQLite database with releases
+      - banned.db     # Include SQLite database with releases
+      - install.sh    # Include installer script
 
 checksum:
   name_template: 'checksums.txt'
@@ -140,6 +141,8 @@ release:
   extra_files:
     - glob: ./README.md
     - glob: ./LICENSE
+    - glob: ./install.sh
+    - glob: ./banned.db
 
 brews:
   - name: banned
