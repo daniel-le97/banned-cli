@@ -17,11 +17,13 @@ A comprehensive command-line tool for downloading and managing content from http
 ### One-Line Install (Recommended)
 
 **Linux/macOS:**
+
 ```bash
 curl -sSL https://github.com/daniel-le97/banned-cli/releases/latest/download/install.sh | bash
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 iwr -useb https://github.com/daniel-le97/banned-cli/releases/latest/download/install.ps1 | iex
 ```
