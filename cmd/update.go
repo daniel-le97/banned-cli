@@ -6,7 +6,6 @@ package cmd
 import (
 	"archive/tar"
 	"archive/zip"
-	"bufio"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -166,10 +165,18 @@ func updateBinary(targetVersion string) error {
 		}
 	}
 
+	fmt.Printf("🧪 Testing new binary...\n")
+
+	// Test the new binary before replacing the old one
+	if err := testBinary(binaryPath, release.TagName); err != nil {
+		return fmt.Errorf("new binary verification failed: %w", err)
+	}
+
+	fmt.Printf("✅ New binary verified successfully!\n")
 	fmt.Printf("🔄 Replacing current binary...\n")
 
-	// Replace the current binary
-	if err := replaceBinary(binaryPath, execPath); err != nil {
+	// Replace the current binary with verification
+	if err := replaceBinaryWithVerification(binaryPath, execPath, release.TagName); err != nil {
 		return fmt.Errorf("failed to replace binary: %w", err)
 	}
 
@@ -385,6 +392,93 @@ func extractFromTarGz(tarGzPath, targetPath string) error {
 	return fmt.Errorf("binary %s not found in tar.gz archive", binaryName)
 }
 
+// testBinary verifies that the new binary works correctly
+func testBinary(binaryPath, expectedVersion string) error {
+	// Test 1: Check if binary is executable and responds to version command
+	cmd := exec.Command(binaryPath, "version")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("binary failed to execute: %w", err)
+	}
+
+	// Test 2: Check if version output contains expected version
+	outputStr := string(output)
+	if !strings.Contains(outputStr, expectedVersion) {
+		return fmt.Errorf("version mismatch: expected %s, got %s", expectedVersion, outputStr)
+	}
+
+	// Test 3: Check if help command works (basic functionality test)
+	cmd = exec.Command(binaryPath, "--help")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("binary help command failed: %w", err)
+	}
+
+	return nil
+}
+
+// replaceBinaryWithVerification replaces the binary with backup and rollback capability
+func replaceBinaryWithVerification(newBinaryPath, currentBinaryPath, expectedVersion string) error {
+	backupPath := currentBinaryPath + ".backup"
+
+	// Step 1: Create backup of current binary
+	if err := copyFile(currentBinaryPath, backupPath); err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+
+	// Step 2: Replace with new binary
+	if err := os.Rename(newBinaryPath, currentBinaryPath); err != nil {
+		// Cleanup backup on failure
+		os.Remove(backupPath)
+		return fmt.Errorf("failed to install new binary: %w", err)
+	}
+
+	// Step 3: Test the installed binary
+	fmt.Printf("🧪 Verifying installed binary...\n")
+	if err := testBinary(currentBinaryPath, expectedVersion); err != nil {
+		fmt.Printf("⚠️  Installed binary verification failed, rolling back...\n")
+
+		// Rollback: restore backup
+		if restoreErr := os.Rename(backupPath, currentBinaryPath); restoreErr != nil {
+			return fmt.Errorf("verification failed AND rollback failed: %w (original error: %v)", restoreErr, err)
+		}
+
+		return fmt.Errorf("binary verification failed after installation, rolled back to previous version: %w", err)
+	}
+
+	// Step 4: Cleanup backup on success
+	os.Remove(backupPath)
+
+	return nil
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	// Copy permissions
+	sourceInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, sourceInfo.Mode())
+}
+
 func replaceBinary(newBinaryPath, currentBinaryPath string) error {
 	// On Windows, we might need to move the current binary before replacing
 	if runtime.GOOS == "windows" {
@@ -414,279 +508,6 @@ func replaceBinary(newBinaryPath, currentBinaryPath string) error {
 	}
 
 	return nil
-}
-
-func checkGoInstalled() error {
-	cmd := exec.Command("go", "version")
-	if err := cmd.Run(); err != nil {
-		// Go is not installed, prompt user for installation
-		fmt.Println("Go is not installed or not available in PATH.")
-		fmt.Println()
-
-		if promptYesNo("Would you like me to help you install Go?") {
-			return installGo()
-		}
-
-		return fmt.Errorf("go installation is required but was declined")
-	}
-	return nil
-}
-
-func promptYesNo(question string) bool {
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Printf("%s [y/N]: ", question)
-		response, err := reader.ReadString('\n')
-		if err != nil {
-			return false
-		}
-
-		response = strings.TrimSpace(strings.ToLower(response))
-		if response == "y" || response == "yes" {
-			return true
-		}
-		if response == "n" || response == "no" || response == "" {
-			return false
-		}
-
-		fmt.Println("Please answer 'y' or 'n'")
-	}
-}
-
-func installGo() error {
-	fmt.Println("Attempting to install Go...")
-
-	switch runtime.GOOS {
-	case "linux":
-		return installGoLinux()
-	case "darwin":
-		return installGoMacOS()
-	case "windows":
-		return installGoWindows()
-	default:
-		return showManualInstallInstructions()
-	}
-}
-
-func installGoLinux() error {
-	// Try different package managers
-	packageManagers := []struct {
-		cmd  string
-		args []string
-		name string
-	}{
-		{"apt", []string{"update", "&&", "apt", "install", "-y", "golang-go"}, "apt (Ubuntu/Debian)"},
-		{"yum", []string{"install", "-y", "golang"}, "yum (RHEL/CentOS)"},
-		{"dnf", []string{"install", "-y", "golang"}, "dnf (Fedora)"},
-		{"pacman", []string{"-S", "--noconfirm", "go"}, "pacman (Arch)"},
-		{"zypper", []string{"install", "-y", "go"}, "zypper (openSUSE)"},
-	}
-
-	for _, pm := range packageManagers {
-		if _, err := exec.LookPath(pm.cmd); err == nil {
-			fmt.Printf("Found %s, attempting installation...\n", pm.name)
-
-			var cmd *exec.Cmd
-			if pm.cmd == "apt" {
-				// Special handling for apt update && install
-				cmd = exec.Command("bash", "-c", "sudo apt update && sudo apt install -y golang-go")
-			} else {
-				args := append([]string{pm.cmd}, pm.args...)
-				cmd = exec.Command("sudo", args...)
-			}
-
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			cmd.Stdin = os.Stdin
-
-			if err := cmd.Run(); err != nil {
-				fmt.Printf("Failed to install Go using %s: %v\n", pm.name, err)
-				continue
-			}
-
-			// Verify installation
-			if checkGoInstallation() {
-				fmt.Println("Go installed successfully!")
-				return nil
-			}
-		}
-	}
-
-	// If all package managers failed, try manual installation
-	fmt.Println("Package manager installation failed. Trying manual installation...")
-	return installGoManualLinux()
-}
-
-func installGoMacOS() error {
-	// Try Homebrew first
-	if _, err := exec.LookPath("brew"); err == nil {
-		fmt.Println("Found Homebrew, attempting installation...")
-		cmd := exec.Command("brew", "install", "go")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err == nil && checkGoInstallation() {
-			fmt.Println("Go installed successfully via Homebrew!")
-			return nil
-		}
-	}
-
-	// Fallback to manual installation
-	return installGoManualMacOS()
-}
-
-func installGoWindows() error {
-	// Try Chocolatey first
-	if _, err := exec.LookPath("choco"); err == nil {
-		fmt.Println("Found Chocolatey, attempting installation...")
-		cmd := exec.Command("choco", "install", "golang", "-y")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err == nil && checkGoInstallation() {
-			fmt.Println("Go installed successfully via Chocolatey!")
-			return nil
-		}
-	}
-
-	// Try Scoop
-	if _, err := exec.LookPath("scoop"); err == nil {
-		fmt.Println("Found Scoop, attempting installation...")
-		cmd := exec.Command("scoop", "install", "go")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err == nil && checkGoInstallation() {
-			fmt.Println("Go installed successfully via Scoop!")
-			return nil
-		}
-	}
-
-	return showManualInstallInstructions()
-}
-
-func installGoManualLinux() error {
-	fmt.Println("Downloading and installing Go manually...")
-
-	// Get latest Go version (simplified - using a known recent version)
-	goVersion := "1.21.5"
-	arch := runtime.GOARCH
-
-	downloadURL := fmt.Sprintf("https://go.dev/dl/go%s.linux-%s.tar.gz", goVersion, arch)
-
-	// Download Go
-	fmt.Printf("Downloading Go from %s...\n", downloadURL)
-	cmd := exec.Command("wget", "-O", "/tmp/go.tar.gz", downloadURL)
-	if err := cmd.Run(); err != nil {
-		// Try curl if wget fails
-		cmd = exec.Command("curl", "-L", "-o", "/tmp/go.tar.gz", downloadURL)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to download Go: %w", err)
-		}
-	}
-
-	// Remove old Go installation
-	exec.Command("sudo", "rm", "-rf", "/usr/local/go").Run()
-
-	// Extract Go
-	fmt.Println("Extracting Go...")
-	cmd = exec.Command("sudo", "tar", "-C", "/usr/local", "-xzf", "/tmp/go.tar.gz")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to extract Go: %w", err)
-	}
-
-	// Add to PATH
-	fmt.Println("Adding Go to PATH...")
-	pathLine := "export PATH=$PATH:/usr/local/go/bin"
-
-	// Try to add to .bashrc or .profile
-	home := os.Getenv("HOME")
-	profiles := []string{".bashrc", ".bash_profile", ".profile", ".zshrc"}
-
-	for _, profile := range profiles {
-		profilePath := filepath.Join(home, profile)
-		if _, err := os.Stat(profilePath); err == nil {
-			cmd = exec.Command("bash", "-c", fmt.Sprintf("echo '%s' >> %s", pathLine, profilePath))
-			cmd.Run()
-			break
-		}
-	}
-
-	fmt.Println("Go installed! Please run 'source ~/.bashrc' or restart your terminal.")
-	fmt.Println("You can also run: export PATH=$PATH:/usr/local/go/bin")
-
-	return nil
-}
-
-func installGoManualMacOS() error {
-	fmt.Println("Please install Go manually:")
-	fmt.Println("1. Go to https://golang.org/dl/")
-	fmt.Println("2. Download the macOS installer (.pkg file)")
-	fmt.Println("3. Run the installer")
-	fmt.Println("4. Restart your terminal")
-
-	return fmt.Errorf("manual installation required")
-}
-
-func checkGoInstallation() bool {
-	cmd := exec.Command("go", "version")
-	return cmd.Run() == nil
-}
-
-func showManualInstallInstructions() error {
-	fmt.Println("\nPlease install Go manually:")
-	fmt.Println("1. Visit: https://golang.org/dl/")
-	fmt.Printf("2. Download the appropriate version for %s/%s\n", runtime.GOOS, runtime.GOARCH)
-	fmt.Println("3. Follow the installation instructions for your operating system")
-	fmt.Println("4. Restart your terminal and try the update command again")
-	fmt.Println()
-
-	return fmt.Errorf("manual Go installation required")
-}
-
-func getGoBinPath() string {
-	// Check GOBIN first
-	if gobin := os.Getenv("GOBIN"); gobin != "" {
-		return gobin
-	}
-
-	// Check GOPATH
-	gopath := os.Getenv("GOPATH")
-	if gopath == "" {
-		// Default GOPATH
-		home := os.Getenv("HOME")
-		if home != "" {
-			gopath = filepath.Join(home, "go")
-		}
-	}
-
-	if gopath != "" {
-		return filepath.Join(gopath, "bin")
-	}
-
-	// Fallback - this shouldn't happen in normal cases
-	return "/usr/local/bin"
-}
-
-func isInPath(dir string) bool {
-	path := os.Getenv("PATH")
-	pathDirs := strings.Split(path, string(os.PathListSeparator))
-
-	for _, pathDir := range pathDirs {
-		if pathDir == dir {
-			return true
-		}
-		// Also check if they resolve to the same directory
-		if abs1, err1 := filepath.Abs(pathDir); err1 == nil {
-			if abs2, err2 := filepath.Abs(dir); err2 == nil {
-				if abs1 == abs2 {
-					return true
-				}
-			}
-		}
-	}
-	return false
 }
 
 func init() {
