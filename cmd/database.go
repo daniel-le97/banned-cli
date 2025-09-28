@@ -3,6 +3,7 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -58,6 +59,16 @@ func initDatabase() (*sql.DB, error) {
 	dbDir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
+	}
+
+	// Check if database exists, if not try to copy bundled database
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		if err := copyBundledDatabase(dbPath); err != nil {
+			// If copying bundled database fails, continue with creating empty database
+			fmt.Printf("📦 Could not copy bundled database (%v), creating empty database...\n", err)
+		} else {
+			fmt.Printf("📦 Initialized with bundled database containing sample data!\n")
+		}
 	}
 
 	// Open database connection
@@ -129,6 +140,60 @@ func isDevelopmentMode() bool {
 	return false
 }
 
+// copyBundledDatabase copies the bundled database.db file to the user's data directory
+func copyBundledDatabase(dbPath string) error {
+	// Look for bundled database in possible locations
+	bundledPaths := []string{
+		"database.db",                            // Same directory as executable
+		"./database.db",                          // Current directory
+		filepath.Join(os.Args[0], "database.db"), // Next to executable (for packaged releases)
+	}
+
+	// Get the directory containing the executable
+	execPath, err := os.Executable()
+	if err == nil {
+		execDir := filepath.Dir(execPath)
+		bundledPaths = append(bundledPaths, filepath.Join(execDir, "database.db"))
+	}
+
+	var bundledDB string
+	for _, path := range bundledPaths {
+		if _, err := os.Stat(path); err == nil {
+			bundledDB = path
+			break
+		}
+	}
+
+	if bundledDB == "" {
+		return fmt.Errorf("no bundled database found in expected locations")
+	}
+
+	// Copy the bundled database to the user location
+	return copyFile(bundledDB, dbPath)
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file %s: %w", src, err)
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	return destFile.Sync()
+}
+
 // createTables creates the necessary database tables
 func createTables() error {
 	if DB == nil {
@@ -171,6 +236,9 @@ func createTables() error {
 		avatar TEXT,
 		cover_image TEXT,
 		is_live BOOLEAN DEFAULT FALSE,
+		total_videos INTEGER DEFAULT 0,
+		total_video_views INTEGER DEFAULT 0,
+		total_likes INTEGER DEFAULT 0,
 		show_times TEXT,
 		show_phone TEXT,
 		website TEXT,
@@ -257,6 +325,45 @@ func runMigrations() error {
 		_, err := DB.Exec("ALTER TABLE videos ADD COLUMN file_size INTEGER DEFAULT 0")
 		if err != nil {
 			return fmt.Errorf("failed to add file_size column: %w", err)
+		}
+	}
+
+	// Check if total_videos column exists in channels table, if not, add it
+	err = DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name='total_videos'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check for total_videos column: %w", err)
+	}
+
+	if count == 0 {
+		_, err := DB.Exec("ALTER TABLE channels ADD COLUMN total_videos INTEGER DEFAULT 0")
+		if err != nil {
+			return fmt.Errorf("failed to add total_videos column: %w", err)
+		}
+	}
+
+	// Check if total_video_views column exists in channels table, if not, add it
+	err = DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name='total_video_views'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check for total_video_views column: %w", err)
+	}
+
+	if count == 0 {
+		_, err := DB.Exec("ALTER TABLE channels ADD COLUMN total_video_views INTEGER DEFAULT 0")
+		if err != nil {
+			return fmt.Errorf("failed to add total_video_views column: %w", err)
+		}
+	}
+
+	// Check if total_likes column exists in channels table, if not, add it
+	err = DB.QueryRow("SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name='total_likes'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check for total_likes column: %w", err)
+	}
+
+	if count == 0 {
+		_, err := DB.Exec("ALTER TABLE channels ADD COLUMN total_likes INTEGER DEFAULT 0")
+		if err != nil {
+			return fmt.Errorf("failed to add total_likes column: %w", err)
 		}
 	}
 
@@ -392,12 +499,13 @@ func StoreChannel(channel Channel) error {
 	_, err = db.Exec(`
 		INSERT OR REPLACE INTO channels (
 			id, title, summary, text_info, avatar, cover_image, is_live,
+			total_videos, total_video_views, total_likes,
 			show_times, show_phone, website, facebook, twitter, gab, minds,
 			telegram, subscribe_star, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`, channel.ID, channel.Title, channel.Summary, channel.TextInfo, channel.Avatar,
-		channel.CoverImage, channel.IsLive, showTimes, showPhone, website, facebook,
-		twitter, gab, minds, telegram, subscribeStar)
+		channel.CoverImage, channel.IsLive, int(channel.TotalVideos), 0, 0,
+		showTimes, showPhone, website, facebook, twitter, gab, minds, telegram, subscribeStar)
 
 	if err != nil {
 		return fmt.Errorf("failed to store channel '%s': %w", channel.ID, err)
@@ -494,6 +602,7 @@ func GetAllChannels() ([]Channel, error) {
 
 	query := `
 		SELECT id, title, summary, text_info, avatar, cover_image, is_live,
+			   COALESCE(total_videos, 0), COALESCE(total_video_views, 0), COALESCE(total_likes, 0),
 			   show_times, show_phone, website, facebook, twitter, gab, minds,
 			   telegram, subscribe_star
 		FROM channels 
@@ -509,17 +618,24 @@ func GetAllChannels() ([]Channel, error) {
 	var channels []Channel
 	for rows.Next() {
 		var channel Channel
+		var totalVideos, totalVideoViews, totalLikes int
 		var showTimes, showPhone, website, facebook, twitter, gab, minds, telegram, subscribeStar sql.NullString
 
 		err := rows.Scan(
 			&channel.ID, &channel.Title, &channel.Summary, &channel.TextInfo,
 			&channel.Avatar, &channel.CoverImage, &channel.IsLive,
+			&totalVideos, &totalVideoViews, &totalLikes,
 			&showTimes, &showPhone, &website, &facebook, &twitter, &gab, &minds,
 			&telegram, &subscribeStar,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan channel: %w", err)
 		}
+
+		// Assign the video counts
+		channel.TotalVideos = float64(totalVideos)
+		channel.TotalVideoViews = float64(totalVideoViews)
+		channel.TotalLikes = float64(totalLikes)
 
 		// Populate nested structs if data exists
 		if showTimes.Valid || showPhone.Valid {

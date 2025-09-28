@@ -41,16 +41,19 @@ type Video struct {
 
 // Channel represents a channel structure
 type Channel struct {
-	ID         string    `json:"_id"`
-	Title      string    `json:"title"`
-	Summary    string    `json:"summary,omitempty"`
-	TextInfo   string    `json:"textInfo,omitempty"`
-	Avatar     string    `json:"avatar,omitempty"`
-	CoverImage string    `json:"coverImage,omitempty"`
-	IsLive     bool      `json:"isLive,omitempty"`
-	Videos     []Video   `json:"videos,omitempty"`
-	ShowInfo   *ShowInfo `json:"showInfo,omitempty"`
-	Links      *Links    `json:"links,omitempty"`
+	ID              string    `json:"_id"`
+	Title           string    `json:"title"`
+	Summary         string    `json:"summary,omitempty"`
+	TextInfo        string    `json:"textInfo,omitempty"`
+	Avatar          string    `json:"avatar,omitempty"`
+	CoverImage      string    `json:"coverImage,omitempty"`
+	IsLive          bool      `json:"isLive,omitempty"`
+	TotalVideos     float64   `json:"totalVideos,omitempty"`
+	TotalVideoViews float64   `json:"totalVideoViews,omitempty"`
+	TotalLikes      float64   `json:"totalLikes,omitempty"`
+	Videos          []Video   `json:"videos,omitempty"`
+	ShowInfo        *ShowInfo `json:"showInfo,omitempty"`
+	Links           *Links    `json:"links,omitempty"`
 }
 
 type ShowInfo struct {
@@ -86,7 +89,7 @@ type GetChannelVideosResponse struct {
 
 type GetChannelResponse struct {
 	Data struct {
-		GetChannelByIDOrTitle Channel `json:"getChannelByIdOrTitle"`
+		GetChannel Channel `json:"getChannel"`
 	} `json:"data"`
 }
 
@@ -396,7 +399,7 @@ func StoreVideosBatch(channelID string, videos []Video) error {
 func (c *Client) FetchChannelData(channelID string) error {
 	query := `
 		query GetChannel($id: String!) {
-			getChannelByIdOrTitle(id: $id) {
+			getChannel(id: $id) {
 				_id
 				title
 				summary
@@ -404,6 +407,7 @@ func (c *Client) FetchChannelData(channelID string) error {
 				avatar
 				coverImage
 				isLive
+				totalVideos
 				showInfo {
 					times
 					phone
@@ -493,7 +497,7 @@ func (c *Client) FetchChannelData(channelID string) error {
 	}
 
 	// Store channel data in database
-	channel := response.Data.GetChannelByIDOrTitle
+	channel := response.Data.GetChannel
 	if err := StoreChannel(channel); err != nil {
 		return fmt.Errorf("failed to store channel in database: %w", err)
 	}
@@ -528,6 +532,7 @@ func (c *Client) FetchAllChannels() error {
 				avatar
 				coverImage
 				isLive
+				totalVideos
 				showInfo {
 					times
 					phone

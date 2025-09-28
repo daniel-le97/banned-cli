@@ -12,6 +12,9 @@ query {
     avatar
     coverImage
     isLive
+    totalVideos
+    totalVideoViews
+    totalLikes
     showInfo {
       times
       phone
@@ -106,6 +109,9 @@ query GetChannels($ids: [String!]!) {
     avatar
     coverImage
     isLive
+    totalVideos
+    totalVideoViews
+    totalLikes
     __typename
   }
 }
@@ -121,6 +127,9 @@ query GetChannel($id: String!) {
     avatar
     coverImage
     isLive
+    totalVideos
+    totalVideoViews
+    totalLikes
     showInfo {
       times
       phone

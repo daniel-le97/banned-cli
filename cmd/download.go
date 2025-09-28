@@ -60,7 +60,17 @@ func getChannelVideoSizes(channelID string, showStats bool) error {
 		return nil
 	}
 
-	fmt.Printf("Found %d videos. Fetching file sizes...\n\n", len(videos))
+	// Count how many videos already have file sizes cached
+	var cachedSizes, needsFetching int
+	for _, video := range videos {
+		if video.FileSize > 0 {
+			cachedSizes++
+		} else if video.DirectURL != "" {
+			needsFetching++
+		}
+	}
+
+	fmt.Printf("Found %d videos (%d cached, %d need fetching)...\n\n", len(videos), cachedSizes, needsFetching)
 
 	// Stats tracking
 	var cachedCount, fetchedCount int64

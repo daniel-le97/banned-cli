@@ -58,6 +58,11 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+    # include additional files in the archive
+    files:
+      - README.md
+      - LICENSE
+      - database.db  # Include SQLite database with releases
 
 checksum:
   name_template: 'checksums.txt'

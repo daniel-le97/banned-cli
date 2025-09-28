@@ -24,34 +24,50 @@ This command allows you to:
 // fetchChannelsCmd fetches all channels
 var fetchChannelsCmd = &cobra.Command{
 	Use:   "channels",
-	Short: "Fetch all channels from API",
-	Long:  `Fetch all available channels from banned.video API and store them in the database.`,
+	Short: "Fetch all channels from API and replace local data",
+	Long: `Fetch all available channels from banned.video API and completely replace the local database with fresh data.
+
+This will:
+- Fetch all current channels from the API
+- Replace all existing channel data with fresh information
+- Update video counts and channel metadata
+- Preserve existing video records but update channel references`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("🔄 Fetching all channels from banned.video...\n")
+		fmt.Printf("⚠️  This will replace all existing channel data with fresh API data.\n")
 
 		client := NewClient("https://api.banned.video/graphql")
+
+		// Get count before fetching
+		db, err := GetDB()
+		if err != nil {
+			fmt.Printf("❌ Could not connect to database: %v\n", err)
+			return
+		}
+
+		var oldCount int
+		db.QueryRow("SELECT COUNT(*) FROM channels").Scan(&oldCount)
+		fmt.Printf("📋 Current channels in database: %d\n", oldCount)
 
 		if err := client.FetchAllChannels(); err != nil {
 			fmt.Printf("❌ Failed to fetch channels: %v\n", err)
 			return
 		}
 
-		fmt.Printf("✅ Successfully fetched and stored channels!\n")
+		fmt.Printf("✅ Successfully fetched and replaced all channel data!\n")
 
 		// Show updated statistics
 		fmt.Println("\n📊 Updated database statistics:")
-		db, err := GetDB()
-		if err != nil {
-			fmt.Printf("⚠️  Could not check database: %v\n", err)
-			return
-		}
+		var newCount int
+		db.QueryRow("SELECT COUNT(*) FROM channels").Scan(&newCount)
+		fmt.Printf("📋 Channels in database: %d\n", newCount)
 
-		var count int
-		err = db.QueryRow("SELECT COUNT(*) FROM channels").Scan(&count)
-		if err != nil {
-			fmt.Printf("⚠️  Could not count channels: %v\n", err)
+		if newCount > oldCount {
+			fmt.Printf("🆕 Added %d new channels\n", newCount-oldCount)
+		} else if newCount < oldCount {
+			fmt.Printf("🗑️  Removed %d obsolete channels\n", oldCount-newCount)
 		} else {
-			fmt.Printf("📋 Channels in database: %d\n", count)
+			fmt.Printf("� Updated %d existing channels\n", newCount)
 		}
 	},
 }
@@ -103,6 +119,15 @@ Examples:
 
 		if !fetchAll {
 			fmt.Printf("✅ Successfully fetched and stored %d videos!\n", len(videos))
+		}
+
+		// Fetch file sizes for videos in background
+		if len(videos) > 0 {
+			go func() {
+				fmt.Printf("📏 Fetching file sizes for %d videos in background...\n", len(videos))
+				fetchVideoFileSizes(videos)
+				fmt.Printf("✅ File sizes updated!\n")
+			}()
 		}
 
 		// Show updated statistics

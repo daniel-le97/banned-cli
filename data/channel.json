@@ -1,0 +1,135 @@
+{
+  "data": {
+    "getChannel": {
+      "_id": "605f5b3039cc2966253190ee",
+      "title": "The Roger Stone Zone",
+      "summary": "The most inflential conservative political and campaign operative alive today",
+      "avatar": "https://download.assets.video/images/c3b2f08f-2a93-4a4c-b323-85b93e936f7e-large.jpg",
+      "coverImage": "https://download.assets.video/images/4c709810-a67c-44e4-898d-1a02f2e32f14-large.jpeg",
+      "totalVideos": 367,
+      "videos": [
+        {
+          "_id": "689e423785d2b7bb0ac99b97",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "68884e07b53cace94995363f",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67b53dd89ed4927e5a370620",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67aeb09eb44bf7e36f7ed029",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67ad495139e29e93150dec1c",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67ac052224d0d021af2ecc00",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67abbadc83ecfcb070f8e0b2",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67a7f096557c9ab2de4919c5",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67a635308b139aa6b5ce3e3b",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67a59171a8f17ae9415ee43a",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67a4fc2113b3e029a3b51cc2",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        },
+        {
+          "_id": "67a39f96a51babb812ac5bf0",
+          "title": "",
+          "summary": "",
+          "largeImage": "",
+          "videoDuration": 0,
+          "createdAt": "",
+          "directUrl": ""
+        }
+      ],
+      "showInfo": {
+        "times": "",
+        "phone": ""
+      },
+      "links": {
+        "website": "",
+        "facebook": "",
+        "twitter": "",
+        "gab": "",
+        "minds": "",
+        "telegram": "",
+        "subscribeStar": ""
+      }
+    }
+  }
+}

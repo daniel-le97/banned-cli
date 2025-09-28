@@ -120,6 +120,61 @@ banned fetch channel alex-jones --all         # Works with channel slugs too
 - Optimized batching: 200-video API calls, 50-video DB batches
 - Displays elapsed time and performance metrics
 
+### Sync Commands (Incremental Updates)
+
+#### `banned sync all`
+
+Perform a complete incremental sync of all channels and videos.
+
+```bash
+banned sync all
+```
+
+This will:
+
+1. Sync any new/updated channels
+2. For each channel, sync only new videos published since the last sync
+3. Show detailed progress and statistics
+
+**Benefits:**
+
+- Much faster than full fetches (only gets new data)
+- Reduces API load and bandwidth usage
+- Perfect for regular updates with pre-populated database
+
+#### `banned sync channels`
+
+Sync only new/updated channels.
+
+```bash
+banned sync channels
+```
+
+#### `banned sync channel <channel-id>`
+
+Sync new videos for a specific channel based on timestamps.
+
+```bash
+# Sync only new videos for a channel
+banned sync channel alex-jones
+banned sync channel 5b885d33e6646a0015a6fa2d
+```
+
+**How it works:**
+
+- Checks your database for the most recent video timestamp
+- Fetches only videos published after that timestamp
+- Automatically fetches file sizes for new videos in background
+- Efficiently updates your local cache without re-downloading
+
+**Options:**
+
+```bash
+# Skip file size fetching for faster sync (useful for large batches)
+banned sync channel alex-jones --skip-file-sizes
+banned sync all --skip-file-sizes
+```
+
 ### Database Commands
 
 #### `banned db init`
