@@ -92,7 +92,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tea.Printf("%s %s", checkMark, pkg), // print success message above our program
 			m.install(m.packages[m.index]),      // download the next package
 		)
-	case errMsg:
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
