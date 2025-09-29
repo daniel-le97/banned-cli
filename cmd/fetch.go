@@ -5,8 +5,8 @@ package cmd
 
 import (
 	"fmt"
-
 	"os"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -132,12 +132,20 @@ Examples:
 			fmt.Printf("✅ Successfully fetched and stored %d videos!\n", len(videos))
 		}
 
-		// Fetch file sizes for videos in background
+		// Fetch file sizes for videos in background (only for videos without file sizes)
 		if len(videos) > 0 {
 			go func() {
-				fmt.Printf("📏 Fetching file sizes for %d videos in background...\n", len(videos))
-				fetchVideoFileSizes(videos)
-				fmt.Printf("✅ File sizes updated!\n")
+				var videosToFetch []Video
+				for _, v := range videos {
+					if v.FileSize == 0 && v.DirectURL != "" {
+						videosToFetch = append(videosToFetch, v)
+					}
+				}
+				if len(videosToFetch) > 0 {
+					fmt.Printf("📏 Fetching file sizes for %d videos in background...\n", len(videosToFetch))
+					fetchVideoFileSizes(videosToFetch)
+					fmt.Printf("✅ File sizes updated!\n")
+				}
 			}()
 		}
 
@@ -279,6 +287,39 @@ func fetchFunc(pkg string) tea.Cmd {
 	}
 	UpdateVideoFileSizeByURL(pkg, size)
 	return returnFunc
+}
+
+// fetchVideoFileSizes fetches file sizes for videos concurrently
+func fetchVideoFileSizes(videos []Video) {
+	var wg sync.WaitGroup
+	semaphore := make(chan struct{}, 10) // Limit concurrent requests
+
+	for _, video := range videos {
+		if video.DirectURL == "" {
+			continue // Skip videos without direct URLs
+		}
+
+		wg.Add(1)
+		go func(v Video) {
+			defer wg.Done()
+
+			// Acquire semaphore for HTTP request
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			// Get file size from HTTP request
+			size, err := getFileSize(v.DirectURL)
+			if err == nil && size > 0 {
+				// Update database with file size
+				if updateErr := UpdateVideoFileSizeByURL(v.DirectURL, size); updateErr != nil {
+					// Don't fail the whole operation, just continue
+					fmt.Printf("Warning: Failed to update file size in database for video %s: %v\n", v.ID, updateErr)
+				}
+			}
+		}(video)
+	}
+
+	wg.Wait()
 }
 
 func init() {

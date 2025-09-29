@@ -268,21 +268,14 @@ func findVideoFiles(directory string) ([]string, error) {
 
 // updateTorrentStatus updates the database to mark that a torrent was created
 func updateTorrentStatus(videoFile, torrentFile string) error {
-	db, err := GetDB()
+	// Try to find the video file in the downloads table and update it
+	err := UpdateDownloadTorrentInfo(videoFile, torrentFile)
 	if err != nil {
-		return err
+		// This is not critical, just log it
+		fmt.Printf("⚠️ Could not update download record: %v\n", err)
 	}
 
-	// Try to find the video file in the downloads table and update it
-	_, err = db.Exec(`
-		UPDATE downloads 
-		SET torrent_created = TRUE, 
-		    torrent_path = ?, 
-		    torrent_created_at = CURRENT_TIMESTAMP
-		WHERE file_path = ?
-	`, torrentFile, videoFile)
-
-	return err
+	return nil
 }
 
 func init() {

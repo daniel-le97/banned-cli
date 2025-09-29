@@ -537,11 +537,12 @@ func displayChannelDetails(channel Channel) error {
 	fmt.Printf("\n🆔 Channel ID: %s\n", channel.ID)
 
 	// Get video count for this channel
-	db, err := GetDB()
+	_, err := GetDB()
 	if err == nil {
-		var videoCount int
-		db.QueryRow("SELECT COUNT(*) FROM videos WHERE channel_id = ?", channel.ID).Scan(&videoCount)
-		fmt.Printf("📹 Videos in database: %d\n", videoCount)
+		videoCount, err := CountVideosForChannel(channel.ID)
+		if err == nil {
+			fmt.Printf("📹 Videos in database: %d\n", videoCount)
+		}
 	}
 
 	fmt.Print("\nPress Enter to continue...")
@@ -877,11 +878,12 @@ func handleChannelSelection(channel Channel) error {
 	fmt.Printf("\n🆔 Channel ID: %s\n", channel.ID)
 
 	// Get video count for this channel
-	db, err := GetDB()
+	_, err := GetDB()
 	if err == nil {
-		var videoCount int
-		db.QueryRow("SELECT COUNT(*) FROM videos WHERE channel_id = ?", channel.ID).Scan(&videoCount)
-		fmt.Printf("📹 Videos in database: %d\n", videoCount)
+		videoCount, err := CountVideosForChannel(channel.ID)
+		if err == nil {
+			fmt.Printf("📹 Videos in database: %d\n", videoCount)
+		}
 	}
 
 	// Ask what to do next

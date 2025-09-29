@@ -180,6 +180,10 @@ func UpdateVideoFileSizeByURL(directURL string, fileSize int64) error {
 	return db.UpdateVideoFileSizeByURL(directURL, fileSize)
 }
 
+func UpdateDownloadTorrentInfo(filePath, torrentPath string) error {
+	return db.UpdateDownloadTorrentInfo(filePath, torrentPath)
+}
+
 // Conversion helper functions
 func convertCmdShowInfoToDB(info *ShowInfo) *db.ShowInfo {
 	if info == nil {
