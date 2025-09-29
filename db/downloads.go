@@ -10,18 +10,18 @@ import (
 
 // Download represents a download record
 type Download struct {
-	ID               string    `json:"id"`
-	URL              string    `json:"url"`
-	Title            string    `json:"title"`
-	Filename         string    `json:"filename"`
-	FilePath         string    `json:"file_path"`
-	FileSize         int64     `json:"file_size"`
-	Status           string    `json:"status"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID               string     `json:"id"`
+	URL              string     `json:"url"`
+	Title            string     `json:"title"`
+	Filename         string     `json:"filename"`
+	FilePath         string     `json:"file_path"`
+	FileSize         int64      `json:"file_size"`
+	Status           string     `json:"status"`
+	CreatedAt        time.Time  `json:"created_at"`
 	CompletedAt      *time.Time `json:"completed_at,omitempty"`
-	ErrorMessage     string    `json:"error_message,omitempty"`
-	TorrentCreated   bool      `json:"torrent_created"`
-	TorrentPath      string    `json:"torrent_path,omitempty"`
+	ErrorMessage     string     `json:"error_message,omitempty"`
+	TorrentCreated   bool       `json:"torrent_created"`
+	TorrentPath      string     `json:"torrent_path,omitempty"`
 	TorrentCreatedAt *time.Time `json:"torrent_created_at,omitempty"`
 }
 
@@ -161,4 +161,27 @@ func GetAllDownloads() ([]Download, error) {
 	}
 
 	return downloads, nil
+}
+
+// DeleteDownload removes a download record from the database
+func DeleteDownload(downloadID string) error {
+	db, err := GetDB()
+	if err != nil {
+		return err
+	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(DownloadsBucket)
+		if bucket == nil {
+			return fmt.Errorf("downloads bucket not found")
+		}
+
+		return bucket.Delete([]byte(downloadID))
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to delete download '%s': %w", downloadID, err)
+	}
+
+	return nil
 }
