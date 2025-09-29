@@ -64,14 +64,15 @@ var dbStatusCmd = &cobra.Command{
 var dbViewCmd = &cobra.Command{
 	Use:   "view",
 	Short: "Interactive database table viewer",
-	Long: `View database tables and records in an interactive Bubble Tea interface.
+	Long: `View database buckets and records in an interactive Bubble Tea interface.
 
-Note: Database viewer is temporarily disabled during bbolt migration.
-Use 'db status' to view bucket statistics instead.`,
+Navigate between buckets (settings, channels, videos, downloads) and browse records
+in a user-friendly table format with bbolt database support.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("� Database viewer is temporarily disabled during bbolt migration")
-		fmt.Println("📊 Use 'banned db status' to view bucket statistics")
-		fmt.Println("💡 Use 'banned config list' to view application settings")
+		if err := RunDatabaseViewer(); err != nil {
+			fmt.Printf("❌ Failed to start database viewer: %v\n", err)
+			return
+		}
 	},
 }
 

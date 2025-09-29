@@ -1,15 +1,15 @@
 package cmd
 
 import (
-	"database/sql"
+	"encoding/json"
 	"fmt"
-	"strconv"
-	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/daniel-le97/banned-cli/db"
+	bolt "go.etcd.io/bbolt"
 )
 
 // Database viewer styles
@@ -39,23 +39,23 @@ var (
 			Foreground(lipgloss.Color("#626262"))
 )
 
-// Database table names and their display names
-var dbTables = map[string]string{
-	"downloads": "Downloads",
+// Database bucket names and their display names
+var dbBuckets = map[string]string{
 	"settings":  "Settings",
 	"channels":  "Channels",
 	"videos":    "Videos",
+	"downloads": "Downloads",
 }
 
 type databaseViewModel struct {
-	db           *sql.DB
-	table        table.Model
-	currentTable string
-	tables       []string
-	tableIndex   int
-	width        int
-	height       int
-	error        error
+	db            *bolt.DB
+	table         table.Model
+	currentBucket string
+	buckets       []string
+	bucketIndex   int
+	width         int
+	height        int
+	error         error
 }
 
 type keyMap struct {
@@ -80,15 +80,15 @@ var keys = keyMap{
 	),
 	Left: key.NewBinding(
 		key.WithKeys("h", "left"),
-		key.WithHelp("←/h", "previous table"),
+		key.WithHelp("←/h", "previous bucket"),
 	),
 	Right: key.NewBinding(
 		key.WithKeys("l", "right"),
-		key.WithHelp("→/l", "next table"),
+		key.WithHelp("→/l", "next bucket"),
 	),
 	Tab: key.NewBinding(
 		key.WithKeys("tab"),
-		key.WithHelp("tab", "switch table"),
+		key.WithHelp("tab", "switch bucket"),
 	),
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
@@ -104,19 +104,19 @@ var keys = keyMap{
 	),
 }
 
-func newDatabaseViewModel(db *sql.DB) *databaseViewModel {
+func newDatabaseViewModel(database *bolt.DB) *databaseViewModel {
 	// Ensure settings is first since we know it has data
-	tables := []string{"settings", "downloads", "channels", "videos"}
+	buckets := []string{"settings", "channels", "videos", "downloads"}
 
 	m := &databaseViewModel{
-		db:           db,
-		tables:       tables,
-		currentTable: "settings",
-		tableIndex:   0,
+		db:            database,
+		buckets:       buckets,
+		currentBucket: "settings",
+		bucketIndex:   0,
 	}
 
-	// Initialize with the settings table
-	m.loadTable(m.currentTable)
+	// Initialize with the settings bucket
+	m.loadBucket(m.currentBucket)
 
 	return m
 }
@@ -126,529 +126,287 @@ func (m *databaseViewModel) Init() tea.Cmd {
 }
 
 func (m *databaseViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.updateTableSize()
+
+		tableHeight := m.height - 6 // Account for title, headers, and status bar
+		if tableHeight < 5 {
+			tableHeight = 5
+		}
+
+		m.table.SetWidth(m.width - 4)
+		m.table.SetHeight(tableHeight)
+		return m, nil
 
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
 
-		case key.Matches(msg, keys.Left):
-			m.previousTable()
-			m.loadTable(m.currentTable)
+		case key.Matches(msg, keys.Left), key.Matches(msg, keys.Tab):
+			m.bucketIndex--
+			if m.bucketIndex < 0 {
+				m.bucketIndex = len(m.buckets) - 1
+			}
+			m.currentBucket = m.buckets[m.bucketIndex]
+			m.loadBucket(m.currentBucket)
+			return m, nil
 
-		case key.Matches(msg, keys.Right), key.Matches(msg, keys.Tab):
-			m.nextTable()
-			m.loadTable(m.currentTable)
-
-		default:
-			m.table, cmd = m.table.Update(msg)
+		case key.Matches(msg, keys.Right):
+			m.bucketIndex++
+			if m.bucketIndex >= len(m.buckets) {
+				m.bucketIndex = 0
+			}
+			m.currentBucket = m.buckets[m.bucketIndex]
+			m.loadBucket(m.currentBucket)
+			return m, nil
 		}
+
+		// Pass other keys to the table
+		var cmd tea.Cmd
+		m.table, cmd = m.table.Update(msg)
+		return m, cmd
 	}
 
-	return m, cmd
+	return m, nil
 }
 
 func (m *databaseViewModel) View() string {
 	if m.error != nil {
-		return fmt.Sprintf("❌ Error loading table '%s': %v\n\nPress 'q' to quit or ←/→ to try other tables.", m.currentTable, m.error)
+		return fmt.Sprintf("❌ Error: %v\nPress 'q' to quit.", m.error)
 	}
 
 	recordCount := len(m.table.Rows())
 	if recordCount == 0 {
-		return fmt.Sprintf("📵 Table '%s' is empty\n\nPress ←/→ to switch tables or 'q' to quit.", dbTables[m.currentTable])
+		return fmt.Sprintf("📵 Bucket '%s' is empty\n\nPress ←/→ to switch buckets or 'q' to quit.", dbBuckets[m.currentBucket])
 	}
 
-	// Title with current table info - use full width
-	titleText := fmt.Sprintf(" 📊 Database Viewer - %s (%d records) ", dbTables[m.currentTable], recordCount)
-	title := titleBarStyle.Width(m.width).Render(titleText)
+	// Title bar
+	titleText := fmt.Sprintf(" 📊 Database Viewer - %s (%d records) ", dbBuckets[m.currentBucket], recordCount)
+	titleBar := titleBarStyle.Width(m.width).Render(titleText)
 
-	// Table navigation info - use full width
-	navInfo := fmt.Sprintf("Table %d/%d - Use ←/→ or Tab to switch", m.tableIndex+1, len(m.tables))
-	navBar := statusBarStyle.Width(m.width).Render(navInfo) // Table view
-	tableView := baseStyle.Render(m.table.View())
+	// Table view
+	tableView := baseStyle.Width(m.width - 2).Height(m.height - 4).Render(m.table.View())
 
-	// Help text
-	helpText := dbHelpStyle.Render("Navigation: ←/→ (switch table) | ↑/↓ (navigate rows) | q (quit)")
+	// Status bar with navigation help
+	statusText := fmt.Sprintf(" ←/→: Switch buckets | ↑/↓: Navigate rows | q: Quit | Current: %s ", m.currentBucket)
+	statusBar := statusBarStyle.Width(m.width).Render(statusText)
 
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		title,
-		navBar,
-		"",
-		tableView,
-		"",
-		helpText,
-	)
+	return fmt.Sprintf("%s\n%s\n%s", titleBar, tableView, statusBar)
 }
 
-func (m *databaseViewModel) nextTable() {
-	m.tableIndex = (m.tableIndex + 1) % len(m.tables)
-	m.currentTable = m.tables[m.tableIndex]
-}
-
-func (m *databaseViewModel) previousTable() {
-	m.tableIndex = (m.tableIndex - 1 + len(m.tables)) % len(m.tables)
-	m.currentTable = m.tables[m.tableIndex]
-}
-
-func (m *databaseViewModel) updateTableSize() {
-	if m.width > 0 && m.height > 0 {
-		// Reserve space for title, status bar, help text, and padding
-		availableHeight := m.height - 8
-		availableWidth := m.width - 4
-
-		if availableHeight < 5 {
-			availableHeight = 5
-		}
-		if availableWidth < 40 {
-			availableWidth = 40
-		}
-
-		m.table.SetWidth(availableWidth)
-		m.table.SetHeight(availableHeight)
-
-		// Recalculate column widths based on available space
-		m.updateColumnWidths(availableWidth)
-	}
-}
-
-func (m *databaseViewModel) updateColumnWidths(availableWidth int) {
-	columns := m.table.Columns()
-	if len(columns) == 0 {
-		return
-	}
-
-	// Calculate new column widths based on table type and available space
-	var newColumns []table.Column
-	switch m.currentTable {
-	case "settings":
-		newColumns = m.calculateSettingsColumnWidths(availableWidth)
-	case "downloads":
-		newColumns = m.calculateDownloadsColumnWidths(availableWidth)
-	case "channels":
-		newColumns = m.calculateChannelsColumnWidths(availableWidth)
-	case "videos":
-		newColumns = m.calculateVideosColumnWidths(availableWidth)
-	default:
-		return
-	}
-
-	m.table.SetColumns(newColumns)
-}
-
-// Helper function to truncate text based on column width
-func (m *databaseViewModel) truncateText(text string, maxWidth int) string {
-	if len(text) <= maxWidth-3 { // Reserve 3 chars for "..."
-		return text
-	}
-	if maxWidth <= 3 {
-		return "..."
-	}
-	return text[:maxWidth-3] + "..."
-}
-
-func (m *databaseViewModel) calculateSettingsColumnWidths(availableWidth int) []table.Column {
-	// Settings: Key, Value, Updated
-	keyWidth := availableWidth * 30 / 100     // 30%
-	valueWidth := availableWidth * 50 / 100   // 50%
-	updatedWidth := availableWidth * 20 / 100 // 20%
-
-	if keyWidth < 15 {
-		keyWidth = 15
-	}
-	if valueWidth < 20 {
-		valueWidth = 20
-	}
-	if updatedWidth < 12 {
-		updatedWidth = 12
-	}
-
-	return []table.Column{
-		{Title: "Key", Width: keyWidth},
-		{Title: "Value", Width: valueWidth},
-		{Title: "Updated", Width: updatedWidth},
-	}
-}
-
-func (m *databaseViewModel) calculateDownloadsColumnWidths(availableWidth int) []table.Column {
-	// Downloads: ID, URL, Title, Status, Created
-	idWidth := availableWidth * 8 / 100       // 8%
-	urlWidth := availableWidth * 40 / 100     // 40%
-	titleWidth := availableWidth * 25 / 100   // 25%
-	statusWidth := availableWidth * 12 / 100  // 12%
-	createdWidth := availableWidth * 15 / 100 // 15%
-
-	if idWidth < 6 {
-		idWidth = 6
-	}
-	if urlWidth < 20 {
-		urlWidth = 20
-	}
-	if titleWidth < 15 {
-		titleWidth = 15
-	}
-	if statusWidth < 8 {
-		statusWidth = 8
-	}
-	if createdWidth < 12 {
-		createdWidth = 12
-	}
-
-	return []table.Column{
-		{Title: "ID", Width: idWidth},
-		{Title: "URL", Width: urlWidth},
-		{Title: "Title", Width: titleWidth},
-		{Title: "Status", Width: statusWidth},
-		{Title: "Created", Width: createdWidth},
-	}
-}
-
-func (m *databaseViewModel) calculateChannelsColumnWidths(availableWidth int) []table.Column {
-	// Channels: ID, Title, Website, Live, Updated
-	idWidth := availableWidth * 15 / 100      // 15%
-	titleWidth := availableWidth * 35 / 100   // 35%
-	websiteWidth := availableWidth * 25 / 100 // 25%
-	liveWidth := availableWidth * 10 / 100    // 10%
-	updatedWidth := availableWidth * 15 / 100 // 15%
-
-	if idWidth < 10 {
-		idWidth = 10
-	}
-	if titleWidth < 20 {
-		titleWidth = 20
-	}
-	if websiteWidth < 15 {
-		websiteWidth = 15
-	}
-	if liveWidth < 6 {
-		liveWidth = 6
-	}
-	if updatedWidth < 12 {
-		updatedWidth = 12
-	}
-
-	return []table.Column{
-		{Title: "ID", Width: idWidth},
-		{Title: "Title", Width: titleWidth},
-		{Title: "Website", Width: websiteWidth},
-		{Title: "Live", Width: liveWidth},
-		{Title: "Updated", Width: updatedWidth},
-	}
-}
-
-func (m *databaseViewModel) calculateVideosColumnWidths(availableWidth int) []table.Column {
-	// Videos: ID, Title, Channel, Duration, Plays
-	idWidth := availableWidth * 12 / 100       // 12%
-	titleWidth := availableWidth * 40 / 100    // 40%
-	channelWidth := availableWidth * 25 / 100  // 25%
-	durationWidth := availableWidth * 12 / 100 // 12%
-	playsWidth := availableWidth * 11 / 100    // 11%
-
-	if idWidth < 10 {
-		idWidth = 10
-	}
-	if titleWidth < 25 {
-		titleWidth = 25
-	}
-	if channelWidth < 15 {
-		channelWidth = 15
-	}
-	if durationWidth < 8 {
-		durationWidth = 8
-	}
-	if playsWidth < 6 {
-		playsWidth = 6
-	}
-
-	return []table.Column{
-		{Title: "ID", Width: idWidth},
-		{Title: "Title", Width: titleWidth},
-		{Title: "Channel", Width: channelWidth},
-		{Title: "Duration", Width: durationWidth},
-		{Title: "Plays", Width: playsWidth},
-	}
-}
-
-func (m *databaseViewModel) loadTable(tableName string) {
+func (m *databaseViewModel) loadBucket(bucketName string) {
 	var columns []table.Column
 	var rows []table.Row
 
-	switch tableName {
-	case "downloads":
-		columns, rows = m.loadDownloadsTable()
-	case "settings":
-		columns, rows = m.loadSettingsTable()
-	case "channels":
-		columns, rows = m.loadChannelsTable()
-	case "videos":
-		columns, rows = m.loadVideosTable()
-	default:
-		m.error = fmt.Errorf("unknown table: %s", tableName)
+	err := m.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket([]byte(bucketName))
+		if bucket == nil {
+			return fmt.Errorf("bucket '%s' not found", bucketName)
+		}
+
+		switch bucketName {
+		case "settings":
+			columns = []table.Column{
+				{Title: "Key", Width: 30},
+				{Title: "Value", Width: 50},
+			}
+
+			bucket.ForEach(func(k, v []byte) error {
+				rows = append(rows, table.Row{
+					string(k),
+					string(v),
+				})
+				return nil
+			})
+
+		case "channels":
+			columns = []table.Column{
+				{Title: "ID", Width: 25},
+				{Title: "Title", Width: 40},
+				{Title: "Videos", Width: 10},
+				{Title: "Views", Width: 15},
+				{Title: "Live", Width: 8},
+			}
+
+			bucket.ForEach(func(k, v []byte) error {
+				var channel db.Channel
+				if err := json.Unmarshal(v, &channel); err != nil {
+					return nil // Skip invalid records
+				}
+
+				liveStatus := "No"
+				if channel.IsLive {
+					liveStatus = "Yes"
+				}
+
+				rows = append(rows, table.Row{
+					truncateString(channel.ID, 23),
+					truncateString(channel.Title, 38),
+					fmt.Sprintf("%.0f", channel.TotalVideos),
+					fmt.Sprintf("%.0f", channel.TotalVideoViews),
+					liveStatus,
+				})
+				return nil
+			})
+
+		case "videos":
+			columns = []table.Column{
+				{Title: "ID", Width: 25},
+				{Title: "Title", Width: 35},
+				{Title: "Duration", Width: 12},
+				{Title: "Views", Width: 10},
+				{Title: "Likes", Width: 8},
+				{Title: "Size", Width: 12},
+			}
+
+			bucket.ForEach(func(k, v []byte) error {
+				var record struct {
+					Video     db.Video `json:"video"`
+					ChannelID string   `json:"channel_id"`
+				}
+				if err := json.Unmarshal(v, &record); err != nil {
+					return nil // Skip invalid records
+				}
+
+				duration := formatDuration(record.Video.VideoDuration)
+				fileSize := formatFileSizeForViewer(record.Video.FileSize)
+
+				rows = append(rows, table.Row{
+					truncateString(record.Video.ID, 23),
+					truncateString(record.Video.Title, 33),
+					duration,
+					fmt.Sprintf("%d", record.Video.PlayCount),
+					fmt.Sprintf("%d", record.Video.LikeCount),
+					fileSize,
+				})
+				return nil
+			})
+
+		case "downloads":
+			columns = []table.Column{
+				{Title: "ID", Width: 25},
+				{Title: "Title", Width: 30},
+				{Title: "Status", Width: 12},
+				{Title: "Size", Width: 12},
+				{Title: "Torrent", Width: 10},
+				{Title: "Created", Width: 15},
+			}
+
+			bucket.ForEach(func(k, v []byte) error {
+				var download db.Download
+				if err := json.Unmarshal(v, &download); err != nil {
+					return nil // Skip invalid records
+				}
+
+				torrentStatus := "No"
+				if download.TorrentCreated {
+					torrentStatus = "Yes"
+				}
+
+				created := download.CreatedAt.Format("2006-01-02")
+				fileSize := formatFileSizeForViewer(download.FileSize)
+
+				rows = append(rows, table.Row{
+					truncateString(download.ID, 23),
+					truncateString(download.Title, 28),
+					download.Status,
+					fileSize,
+					torrentStatus,
+					created,
+				})
+				return nil
+			})
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		m.error = err
 		return
 	}
 
-	// Check if we got data
-	if len(columns) == 0 {
-		m.error = fmt.Errorf("no columns found for table: %s", tableName)
-		return
-	}
-
-	// Create a default row if no data
-	if len(rows) == 0 {
-		rows = []table.Row{{"No data", "Table is empty", "", "", ""}}
-	}
-
-	// Create table without fixed dimensions
-	m.table = table.New(
+	// Create and configure the table
+	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
+		table.WithHeight(m.height-6),
 	)
 
-	// Apply styling
+	// Apply custom styles
 	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(true)
+	s.Header = headerStyle
 	s.Selected = s.Selected.
 		Foreground(lipgloss.Color("229")).
 		Background(lipgloss.Color("57")).
 		Bold(false)
-	m.table.SetStyles(s)
+	t.SetStyles(s)
 
-	// Update table size to fit terminal
-	m.updateTableSize()
+	m.table = t
 	m.error = nil
 }
 
-func (m *databaseViewModel) loadSettingsTable() ([]table.Column, []table.Row) {
-	// Use default widths that will be updated by updateColumnWidths
-	columns := m.calculateSettingsColumnWidths(80) // Default fallback width
-
-	query := "SELECT key, value, updated_at FROM settings ORDER BY key"
-
-	dbRows, err := m.db.Query(query)
-	if err != nil {
-		return columns, []table.Row{{"Error", fmt.Sprintf("Query failed: %v", err), "N/A"}}
+// Helper functions
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
 	}
-	defer dbRows.Close()
-
-	var rows []table.Row
-	for dbRows.Next() {
-		var key, value, updatedAt string
-
-		if err := dbRows.Scan(&key, &value, &updatedAt); err != nil {
-			continue
-		}
-
-		// Get current column widths for dynamic truncation
-		currentColumns := m.calculateSettingsColumnWidths(m.width)
-		valueMaxWidth := currentColumns[1].Width
-
-		// Truncate value dynamically based on column width
-		value = m.truncateText(value, valueMaxWidth)
-
-		// Parse and format date
-		if t, err := time.Parse(time.RFC3339, updatedAt); err == nil {
-			updatedAt = t.Format("2006-01-02 15:04")
-		}
-
-		rows = append(rows, table.Row{
-			key,
-			value,
-			updatedAt,
-		})
+	if maxLen <= 3 {
+		return s[:maxLen]
 	}
-
-	return columns, rows
+	return s[:maxLen-3] + "..."
 }
 
-func (m *databaseViewModel) loadDownloadsTable() ([]table.Column, []table.Row) {
-	// Use default widths that will be updated by updateColumnWidths
-	columns := m.calculateDownloadsColumnWidths(80) // Default fallback width
-
-	query := `
-		SELECT id, url, COALESCE(title, 'Unknown'), 
-		       COALESCE(status, 'pending'), created_at 
-		FROM downloads 
-		ORDER BY created_at DESC 
-		LIMIT 100`
-
-	dbRows, err := m.db.Query(query)
-	if err != nil {
-		return columns, []table.Row{{"Error", fmt.Sprintf("Query failed: %v", err), "", "", ""}}
-	}
-	defer dbRows.Close()
-
-	var rows []table.Row
-	for dbRows.Next() {
-		var id int
-		var url, title, status, createdAt string
-
-		if err := dbRows.Scan(&id, &url, &title, &status, &createdAt); err != nil {
-			continue
-		}
-
-		// Get current column widths for dynamic truncation
-		currentColumns := m.calculateDownloadsColumnWidths(m.width)
-		urlMaxWidth := currentColumns[1].Width
-		titleMaxWidth := currentColumns[2].Width
-
-		// Truncate dynamically based on column width
-		url = m.truncateText(url, urlMaxWidth)
-		title = m.truncateText(title, titleMaxWidth)
-
-		// Parse and format date
-		if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
-			createdAt = t.Format("2006-01-02 15:04")
-		}
-
-		rows = append(rows, table.Row{
-			strconv.Itoa(id),
-			url,
-			title,
-			status,
-			createdAt,
-		})
+func formatDuration(seconds float64) string {
+	if seconds <= 0 {
+		return "0:00"
 	}
 
-	return columns, rows
+	totalSeconds := int(seconds)
+	hours := totalSeconds / 3600
+	minutes := (totalSeconds % 3600) / 60
+	secs := totalSeconds % 60
+
+	if hours > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", hours, minutes, secs)
+	}
+	return fmt.Sprintf("%d:%02d", minutes, secs)
 }
 
-func (m *databaseViewModel) loadChannelsTable() ([]table.Column, []table.Row) {
-	// Use default widths that will be updated by updateColumnWidths
-	columns := m.calculateChannelsColumnWidths(80) // Default fallback width
-
-	query := `
-		SELECT id, COALESCE(title, 'Unknown'), COALESCE(website, ''), 
-		       COALESCE(is_live, 0), COALESCE(updated_at, created_at)
-		FROM channels 
-		ORDER BY title 
-		LIMIT 100`
-
-	dbRows, err := m.db.Query(query)
-	if err != nil {
-		return columns, []table.Row{{"Error", fmt.Sprintf("Query failed: %v", err), "", "", ""}}
-	}
-	defer dbRows.Close()
-
-	var rows []table.Row
-	for dbRows.Next() {
-		var isLive int
-		var id, title, website, updatedAt string
-
-		if err := dbRows.Scan(&id, &title, &website, &isLive, &updatedAt); err != nil {
-			continue
-		}
-
-		// Get current column widths for dynamic truncation
-		currentColumns := m.calculateChannelsColumnWidths(m.width)
-		idMaxWidth := currentColumns[0].Width
-		titleMaxWidth := currentColumns[1].Width
-		websiteMaxWidth := currentColumns[2].Width
-
-		// Truncate dynamically based on column width
-		id = m.truncateText(id, idMaxWidth)
-		title = m.truncateText(title, titleMaxWidth)
-		website = m.truncateText(website, websiteMaxWidth)
-
-		// Convert isLive to readable format
-		liveStatus := "No"
-		if isLive == 1 {
-			liveStatus = "Yes"
-		}
-
-		// Parse and format date
-		if t, err := time.Parse(time.RFC3339, updatedAt); err == nil {
-			updatedAt = t.Format("2006-01-02 15:04")
-		}
-
-		rows = append(rows, table.Row{
-			id,
-			title,
-			website,
-			liveStatus,
-			updatedAt,
-		})
+func formatFileSizeForViewer(bytes int64) string {
+	if bytes == 0 {
+		return "Unknown"
 	}
 
-	return columns, rows
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
-func (m *databaseViewModel) loadVideosTable() ([]table.Column, []table.Row) {
-	// Use default widths that will be updated by updateColumnWidths
-	columns := m.calculateVideosColumnWidths(80) // Default fallback width
-
-	query := `
-		SELECT v.id, COALESCE(v.title, 'Untitled'), 
-		       COALESCE(c.title, 'Unknown'), 
-		       COALESCE(v.video_duration, 0), 
-		       COALESCE(v.play_count, 0)
-		FROM videos v
-		LEFT JOIN channels c ON v.channel_id = c.id
-		ORDER BY v.play_count DESC 
-		LIMIT 100`
-
-	dbRows, err := m.db.Query(query)
+// RunDatabaseViewer starts the interactive database viewer
+func RunDatabaseViewer() error {
+	database, err := GetDB()
 	if err != nil {
-		return columns, []table.Row{{"Error", fmt.Sprintf("Query failed: %v", err), "", "", ""}}
-	}
-	defer dbRows.Close()
-
-	var rows []table.Row
-	for dbRows.Next() {
-		var duration float64
-		var playCount int
-		var id, title, channel string
-
-		if err := dbRows.Scan(&id, &title, &channel, &duration, &playCount); err != nil {
-			continue
-		}
-
-		// Get current column widths for dynamic truncation
-		currentColumns := m.calculateVideosColumnWidths(m.width)
-		idMaxWidth := currentColumns[0].Width
-		titleMaxWidth := currentColumns[1].Width
-		channelMaxWidth := currentColumns[2].Width
-
-		// Truncate dynamically based on column width
-		id = m.truncateText(id, idMaxWidth)
-		title = m.truncateText(title, titleMaxWidth)
-		channel = m.truncateText(channel, channelMaxWidth)
-
-		// Format duration from float (seconds) to mm:ss
-		var durationStr string
-		if duration > 0 {
-			totalSeconds := int(duration)
-			hours := totalSeconds / 3600
-			minutes := (totalSeconds % 3600) / 60
-			seconds := totalSeconds % 60
-			if hours > 0 {
-				durationStr = fmt.Sprintf("%d:%02d:%02d", hours, minutes, seconds)
-			} else {
-				durationStr = fmt.Sprintf("%d:%02d", minutes, seconds)
-			}
-		} else {
-			durationStr = "Unknown"
-		}
-
-		rows = append(rows, table.Row{
-			id,
-			title,
-			channel,
-			durationStr,
-			strconv.Itoa(playCount),
-		})
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	return columns, rows
+	model := newDatabaseViewModel(database)
+
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("failed to run database viewer: %w", err)
+	}
+
+	return nil
 }
