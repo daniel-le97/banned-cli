@@ -1,13 +1,23 @@
-# Banned - banned.video Content Manager - DO NOT USE THIS BRANCH I WILL BE MOVING BACK TO SQLITE
+# Banned - banned.video Content Manager
 
-A comprehensive command-line tool for downloading and managing content from https://banned.video. This tool provides an interactive Terminal User Interface (TUI) for browsing channels, fetching video metadata, and managing downloads with advanced features like recursive fetching and torrent creation.
+A comprehensive command-line tool for downloading and managing content from https://banned.video. This tool provides an interactive Terminal User Interface (TUI) for browsing channels, fetching video metadata, and managing downloads with advanced features like recursive fetching, intelligent conditional fetching, and torrent creation.
+
+**Latest Updates:**
+
+- 🔄 **Database Migration**: Migrated from SQLite to bbolt for improved performance
+- 🧠 **Smart Fetching**: Conditional video fetching only when database < API video counts
+- ⚡ **Performance**: Worker pool optimization for file-sizes (~21.9 videos/second)
+- 🖱️ **Enhanced UI**: Interactive database viewer with mouse support and clipboard functionality
 
 ## 🚀 Features
 
 - **Interactive TUI**: Browse channels and videos with a beautiful terminal interface
-- **Recursive Video Fetching**: Automatically fetch all videos from channels with pagination support
-- **High Performance**: Optimized for bulk operations (~103 videos/second)
-- **Database Management**: SQLite database for local storage and caching
+- **Smart Conditional Fetching**: Only fetches videos when database count < API total (avoids unnecessary API calls)
+- **High Performance**: Optimized for bulk operations with worker pools (~21.9 videos/second for file sizes)
+- **Database Management**: bbolt key-value database for fast local storage and caching
+- **Interactive Database Viewer**: Mouse-enabled browsing with clipboard support for data inspection
+- **File Size Preservation**: Maintains existing file sizes during video updates to prevent re-fetching
+- **Worker Pool Architecture**: 100 concurrent workers for high-throughput operations
 - **Torrent Support**: Create .torrent files from downloaded videos
 - **Smart Installation**: Multiple installation methods with PATH management
 - **Self-Updating**: Built-in update mechanism from source repositories
@@ -98,33 +108,36 @@ Fetch all available channels from banned.video API and store in database.
 banned fetch channels
 ```
 
-#### `banned fetch channel <channel-id>`
+#### `banned fetch videos <channel-id>`
 
-Fetch specific channel details and videos with options for recursive fetching.
+Fetch specific channel details and videos with intelligent conditional fetching.
 
 ```bash
 # Fetch first 50 videos (default)
-banned fetch channel 12345
+banned fetch videos 12345
 
-# Fetch ALL videos recursively (recommended for complete data)
-banned fetch channel 12345 --all
-
-# Fetch specific number of videos
-banned fetch channel 12345 --limit 1000
+# Fetch ALL videos with smart conditional logic (recommended)
+banned fetch videos 12345 --all
 
 # Examples
-banned fetch channel 12345 --all              # Fetch all videos
-banned fetch channel 607 --limit 500          # Fetch up to 500 videos
-banned fetch channel alex-jones --all         # Works with channel slugs too
+banned fetch videos 5b885d33e6646a0015a6fa2d --all    # Fetch Alex Jones channel
+banned fetch videos 5cf7df690a17850012626701 --all    # Fetch Mike Adams channel
 ```
+
+**Smart Conditional Fetching:**
+
+- **Intelligence**: Only fetches when database video count < API totalVideos count
+- **Efficiency**: Skips unnecessary API calls when database is up-to-date
+- **Performance**: Shows "missing X videos" and only fetches the difference
+- **Status Display**: Clear comparison of database vs API video counts
 
 **Performance Notes:**
 
 - Default: Fetches 50 videos per request
-- `--all`: Recursively fetches until no new videos (recommended)
-- `--limit N`: Sets maximum videos to fetch
-- Optimized batching: 200-video API calls, 50-video DB batches
+- `--all`: Conditionally fetches until database matches API count
+- Optimized batching: 200-video API calls, efficient database storage
 - Displays elapsed time and performance metrics
+- Automatic file size fetching in background with worker pools
 
 ### Sync Commands (Incremental Updates)
 
@@ -202,8 +215,25 @@ banned db status
 Displays:
 
 - Database location and connection status
-- Table counts (channels, videos, downloads)
+- Bucket counts (channels, videos, downloads, settings)
 - Storage usage and performance metrics
+
+#### `banned db view`
+
+Interactive database viewer with mouse support and clipboard functionality.
+
+```bash
+banned db view
+```
+
+Features:
+
+- **Mouse Support**: Click to select items, drag to scroll
+- **Clipboard Integration**: Copy data to clipboard with Enter/Ctrl+C
+- **Bucket Navigation**: Use ←/→ to switch between data buckets
+- **Row Navigation**: Use ↑/↓ to browse items
+- **Details Panel**: Press Enter/Space to view full item details
+- **Search & Filter**: Type 'd' to toggle details view
 
 #### `banned db settings`
 
@@ -309,12 +339,19 @@ banned download [options]
 
 ## 🗂️ Database Schema
 
-The application uses SQLite with the following tables:
+The application uses bbolt (key-value store) with the following buckets:
 
-- **channels**: Channel metadata (id, name, slug, description, etc.)
-- **videos**: Video metadata (id, title, channel_id, duration, etc.)
+- **channels**: Channel metadata (id, name, slug, description, totalVideos, etc.)
+- **videos**: Video metadata (id, title, channel_id, duration, file_size, etc.) with preserved file sizes
 - **downloads**: Download tracking and status
 - **settings**: Application configuration and preferences
+
+**Performance Benefits of bbolt Migration:**
+
+- Faster read/write operations for large datasets
+- Better concurrent access handling
+- Reduced memory footprint
+- Eliminates database lock issues under high load
 
 ## ⚙️ Configuration
 
@@ -353,9 +390,11 @@ banned config reset download_dir
 
 ### Database Location
 
-- **Linux/macOS**: `~/.local/share/banned/banned.db`
+- **Linux/macOS**: `~/.config/banned/banned.db`
 - **Windows**: `%APPDATA%\banned\banned.db`
 - **Current Directory**: `./banned.db` (fallback)
+
+**Note**: Database migrated from SQLite to bbolt for improved performance and reliability.
 
 ### Default Settings
 
@@ -381,12 +420,22 @@ banned torrent batch ~/Downloads/banned/
 ### Performance Optimization
 
 ```bash
-# For large channels, use --all flag for optimal API usage
-banned fetch channel large-channel-id --all
+# For large channels, use --all flag for optimal API usage with conditional fetching
+banned fetch videos large-channel-id --all
 
-# Monitor performance with timing
-time banned fetch channel alex-jones --all
+# Monitor performance with timing (includes intelligent skipping)
+time banned fetch videos 5b885d33e6646a0015a6fa2d --all
+
+# Background file size fetching with 100 concurrent workers
+banned fetch file-sizes 5cf7df690a17850012626701  # ~21.9 videos/second
 ```
+
+**Worker Pool Performance:**
+
+- File size fetching: 100 concurrent workers
+- Throughput: ~21.9 videos/second (6,802 videos in 5m11s)
+- Error categorization: timeouts, network failures, HTTP errors
+- Real-time progress reporting with error statistics
 
 ### Scripting Integration
 
