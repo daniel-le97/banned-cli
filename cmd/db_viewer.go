@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
@@ -56,6 +57,7 @@ type databaseViewModel struct {
 	width         int
 	height        int
 	error         error
+	rawData       []interface{} // Store raw data for selected rows
 }
 
 type keyMap struct {
@@ -91,8 +93,8 @@ var keys = keyMap{
 		key.WithHelp("tab", "switch bucket"),
 	),
 	Enter: key.NewBinding(
-		key.WithKeys("enter"),
-		key.WithHelp("enter", "select"),
+		key.WithKeys("enter", "space"),
+		key.WithHelp("enter/space", "print selected"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
@@ -142,10 +144,23 @@ func (m *databaseViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.SetHeight(tableHeight)
 		return m, nil
 
+	case tea.MouseMsg:
+		if msg.Type == tea.MouseLeft {
+			// Handle mouse clicks on table rows
+			var cmd tea.Cmd
+			m.table, cmd = m.table.Update(msg)
+			return m, cmd
+		}
+
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, keys.Quit):
 			return m, tea.Quit
+
+		case key.Matches(msg, keys.Enter):
+			// Print selected row data to console
+			m.printSelectedItem()
+			return m, nil
 
 		case key.Matches(msg, keys.Left), key.Matches(msg, keys.Tab):
 			m.bucketIndex--
@@ -193,15 +208,59 @@ func (m *databaseViewModel) View() string {
 	tableView := m.table.View()
 
 	// Status bar with navigation help - use full width
-	statusText := fmt.Sprintf(" ←/→: Switch buckets | ↑/↓: Navigate rows | q: Quit | Current: %s ", m.currentBucket)
+	statusText := fmt.Sprintf(" ←/→: Switch buckets | ↑/↓: Navigate rows | Enter/Space: Print selected | q: Quit | Current: %s ", m.currentBucket)
 	statusBar := statusBarStyle.Width(m.width).Render(statusText)
 
 	return fmt.Sprintf("%s\n%s\n%s", titleBar, tableView, statusBar)
 }
 
+// printSelectedItem prints the selected row's raw data to stdout
+func (m *databaseViewModel) printSelectedItem() {
+	selectedRow := m.table.Cursor()
+	if selectedRow < 0 || selectedRow >= len(m.rawData) {
+		fmt.Printf("No item selected or invalid selection\n")
+		return
+	}
+
+	selectedData := m.rawData[selectedRow]
+
+	fmt.Printf("\n" + strings.Repeat("=", 80) + "\n")
+	fmt.Printf("Selected %s Record #%d:\n", dbBuckets[m.currentBucket], selectedRow+1)
+	fmt.Printf(strings.Repeat("=", 80) + "\n")
+
+	switch data := selectedData.(type) {
+	case map[string]string:
+		// Settings data
+		for key, value := range data {
+			fmt.Printf("Key: %s\n", key)
+			fmt.Printf("Value: %s\n", value)
+			fmt.Printf(strings.Repeat("-", 40) + "\n")
+		}
+	case db.Channel:
+		// Channel data
+		prettyJSON, _ := json.MarshalIndent(data, "", "  ")
+		fmt.Printf("%s\n", string(prettyJSON))
+	case db.Video:
+		// Video data
+		prettyJSON, _ := json.MarshalIndent(data, "", "  ")
+		fmt.Printf("%s\n", string(prettyJSON))
+	case db.Download:
+		// Download data
+		prettyJSON, _ := json.MarshalIndent(data, "", "  ")
+		fmt.Printf("%s\n", string(prettyJSON))
+	default:
+		fmt.Printf("Raw data: %+v\n", selectedData)
+	}
+
+	fmt.Printf(strings.Repeat("=", 80) + "\n")
+}
+
 func (m *databaseViewModel) loadBucket(bucketName string) {
 	var columns []table.Column
 	var rows []table.Row
+
+	// Clear and reinitialize raw data storage
+	m.rawData = make([]interface{}, 0)
 
 	err := m.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(bucketName))
@@ -227,6 +286,12 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 			}
 
 			bucket.ForEach(func(k, v []byte) error {
+				// Store raw data for this row
+				rawItem := map[string]string{
+					string(k): string(v),
+				}
+				m.rawData = append(m.rawData, rawItem)
+
 				rows = append(rows, table.Row{
 					string(k),
 					string(v),
@@ -262,6 +327,9 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 				if err := json.Unmarshal(v, &channel); err != nil {
 					return nil // Skip invalid records
 				}
+
+				// Store raw channel data
+				m.rawData = append(m.rawData, channel)
 
 				liveStatus := "No"
 				if channel.IsLive {
@@ -312,6 +380,9 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 					return nil // Skip invalid records
 				}
 
+				// Store raw video data
+				m.rawData = append(m.rawData, record.Video)
+
 				duration := formatDuration(record.Video.VideoDuration)
 				fileSize := formatFileSizeForViewer(record.Video.FileSize)
 
@@ -356,6 +427,9 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 				if err := json.Unmarshal(v, &download); err != nil {
 					return nil // Skip invalid records
 				}
+
+				// Store raw download data
+				m.rawData = append(m.rawData, download)
 
 				torrentStatus := "No"
 				if download.TorrentCreated {
@@ -457,6 +531,11 @@ func RunDatabaseViewer() error {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
+	fmt.Printf("Starting interactive database viewer...\n")
+	fmt.Printf("💡 Mouse selection and text copying are enabled in your terminal.\n")
+	fmt.Printf("📋 Press Enter/Space on any row to print its full data to console.\n")
+	fmt.Printf("⌨️  Use ←/→ to switch buckets, ↑/↓ to navigate rows, 'q' to quit.\n\n")
+
 	model := newDatabaseViewModel(database)
 
 	// Use alt screen and enable mouse support for better full-screen experience
@@ -464,6 +543,8 @@ func RunDatabaseViewer() error {
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("failed to run database viewer: %w", err)
 	}
+
+	fmt.Printf("\n✅ Database viewer closed.\n")
 
 	return nil
 }
