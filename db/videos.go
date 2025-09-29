@@ -14,7 +14,7 @@ type VideoRecord struct {
 	ChannelID string `json:"channel_id"`
 }
 
-// StoreVideos stores multiple videos in the database
+// StoreVideos stores multiple videos in the database, preserving existing file sizes
 func StoreVideos(channelID string, videos []Video) error {
 	db, err := GetDB()
 	if err != nil {
@@ -28,6 +28,19 @@ func StoreVideos(channelID string, videos []Video) error {
 		}
 
 		for _, video := range videos {
+			// Check if video already exists to preserve file size
+			existingData := bucket.Get([]byte(video.ID))
+			if existingData != nil {
+				// Video exists, merge with existing file size
+				var existingRecord VideoRecord
+				if err := json.Unmarshal(existingData, &existingRecord); err == nil {
+					// Preserve the existing file size if it exists
+					if existingRecord.Video.FileSize > 0 && video.FileSize == 0 {
+						video.FileSize = existingRecord.Video.FileSize
+					}
+				}
+			}
+
 			record := VideoRecord{
 				Video:     video,
 				ChannelID: channelID,
@@ -362,8 +375,13 @@ func UpdateVideoFileSizeByURL(directURL string, fileSize int64) error {
 			return fmt.Errorf("videos bucket not found")
 		}
 
-		// Find the video with the matching direct URL
-		return bucket.ForEach(func(k, v []byte) error {
+		// Find and update the video with the matching direct URL
+		var found bool
+		err := bucket.ForEach(func(k, v []byte) error {
+			if found {
+				return nil // Skip if already found and updated
+			}
+
 			var record VideoRecord
 			if err := json.Unmarshal(v, &record); err != nil {
 				return nil // Skip invalid records
@@ -372,6 +390,7 @@ func UpdateVideoFileSizeByURL(directURL string, fileSize int64) error {
 			if record.Video.DirectURL == directURL {
 				// Update the file size
 				record.Video.FileSize = fileSize
+				found = true
 
 				// Marshal and save back
 				updatedData, err := json.Marshal(record)
@@ -384,6 +403,12 @@ func UpdateVideoFileSizeByURL(directURL string, fileSize int64) error {
 
 			return nil
 		})
+
+		if !found {
+			return fmt.Errorf("video with URL '%s' not found", directURL)
+		}
+
+		return err
 	})
 
 	if err != nil {

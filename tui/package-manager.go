@@ -21,8 +21,8 @@ type skrrt struct {
 	spinner       spinner.Model
 	progress      progress.Model
 	done          bool
-	onError 	 func(error)
-	onSuccess	 func(string)
+	onError       func(error)
+	onSuccess     func(string)
 }
 type model struct {
 	packages      []string
@@ -54,6 +54,24 @@ func NewPackageManagerModel(word string, packages []string, InstallFunc func(str
 	return model{
 		word:     word,
 		install:  InstallFunc,
+		packages: packages,
+		spinner:  s,
+		progress: p,
+	}
+}
+
+// NewConcurrentPackageManagerModel creates a model that processes all packages concurrently using Bubble Tea Batch
+func NewConcurrentPackageManagerModel(word string, packages []string, installFunc func(string) tea.Cmd) model {
+	p := progress.New(
+		progress.WithDefaultGradient(),
+		progress.WithWidth(50),
+		progress.WithoutPercentage(),
+	)
+	s := spinner.New()
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+	return model{
+		word:     word,
+		install:  installFunc,
 		packages: packages,
 		spinner:  s,
 		progress: p,

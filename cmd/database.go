@@ -152,28 +152,50 @@ func GetVideosWithoutFileSize(channelID string) ([]Video, error) {
 		return nil, err
 	}
 
-	// Convert db.Video to cmd.Video
-	var videos []Video
-	for _, dbVideo := range dbVideos {
-		video := Video{
-			ID:            dbVideo.ID,
-			Title:         dbVideo.Title,
-			Summary:       dbVideo.Summary,
-			LargeImage:    dbVideo.LargeImage,
-			VideoDuration: dbVideo.VideoDuration,
-			CreatedAt:     dbVideo.CreatedAt,
-			DirectURL:     dbVideo.DirectURL,
-			PlayCount:     dbVideo.PlayCount,
-			LikeCount:     dbVideo.LikeCount,
-			AngerCount:    dbVideo.AngerCount,
-			EmbedURL:      dbVideo.EmbedURL,
-			Published:     dbVideo.Published,
-			FileSize:      dbVideo.FileSize,
+	// Convert []db.Video to []cmd.Video
+	videos := make([]Video, len(dbVideos))
+	for i, v := range dbVideos {
+		videos[i] = Video{
+			ID:            v.ID,
+			Title:         v.Title,
+			Summary:       v.Summary,
+			LargeImage:    v.LargeImage,
+			VideoDuration: v.VideoDuration,
+			CreatedAt:     v.CreatedAt,
+			DirectURL:     v.DirectURL,
+			PlayCount:     v.PlayCount,
+			LikeCount:     v.LikeCount,
+			AngerCount:    v.AngerCount,
+			EmbedURL:      v.EmbedURL,
+			Published:     v.Published,
+			FileSize:      v.FileSize,
 		}
-		videos = append(videos, video)
+	}
+	return videos, nil
+}
+
+func GetChannelByID(channelID string) (*Channel, error) {
+	dbChannel, err := db.GetChannel(channelID)
+	if err != nil {
+		return nil, err
 	}
 
-	return videos, nil
+	// Convert db.Channel to cmd.Channel
+	channel := &Channel{
+		ID:              dbChannel.ID,
+		Title:           dbChannel.Title,
+		Summary:         dbChannel.Summary,
+		TextInfo:        dbChannel.TextInfo,
+		Avatar:          dbChannel.Avatar,
+		CoverImage:      dbChannel.CoverImage,
+		IsLive:          dbChannel.IsLive,
+		TotalVideos:     dbChannel.TotalVideos,
+		TotalVideoViews: dbChannel.TotalVideoViews,
+		TotalLikes:      dbChannel.TotalLikes,
+		ShowInfo:        convertDBShowInfoToCmd(dbChannel.ShowInfo),
+		Links:           convertDBLinksToCmd(dbChannel.Links),
+	}
+	return channel, nil
 }
 
 func UpdateVideoFileSizeByURL(directURL string, fileSize int64) error {

@@ -4,52 +4,46 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"net/http"
-	"strconv"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/spf13/cobra"
 )
 
-// VideoInfo holds video information with file size
-type VideoInfo struct {
-	ID        string
-	Title     string
-	DirectURL string
-	FileSize  int64
-	Error     error
-}
-
 // downloadCmd represents the download command
 var downloadCmd = &cobra.Command{
 	Use:   "download [channel-id]",
-	Short: "Get all direct URLs and file sizes for videos from a given channel",
-	Long: `Retrieves all videos from the database for a specified channel ID 
-and fetches the file size for each video's direct URL.
+	Short: "Download all videos for a channel",
+	Long: `Downloads all videos for a specified channel ID to the configured download folder.
+Shows total file size and prompts for confirmation before downloading.
 
 Example:
   banned download 5b885d33e6646a0015a6fa2d
-  banned download 5b885d33e6646a0015a6fa2d --stats`,
+  banned download 5b885d33e6646a0015a6fa2d --force`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		channelID := args[0]
-		showStats, _ := cmd.Flags().GetBool("stats")
+		force, _ := cmd.Flags().GetBool("force")
 
-		if err := getChannelVideoSizes(channelID, showStats); err != nil {
+		if err := downloadChannelVideos(channelID, force); err != nil {
 			fmt.Printf("Error: %v\n", err)
 			return
 		}
 	},
 }
 
-// getChannelVideoSizes retrieves all videos for a channel and gets their file sizes
-func getChannelVideoSizes(channelID string, showStats bool) error {
-	fmt.Printf("📺 Fetching videos for channel: %s\n\n", channelID)
+// downloadChannelVideos downloads all videos for a channel after showing total size and prompting user
+func downloadChannelVideos(channelID string, force bool) error {
+	fmt.Printf("📺 Preparing to download videos for channel: %s\n\n", channelID)
 
-	// Get all videos from database (using a large limit to get all)
+	// Get all videos from database
 	videos, err := GetChannelVideos(channelID, 10000, 0)
 	if err != nil {
 		return fmt.Errorf("failed to get videos from database: %w", err)
@@ -60,174 +54,198 @@ func getChannelVideoSizes(channelID string, showStats bool) error {
 		return nil
 	}
 
-	// Count how many videos already have file sizes cached
-	var cachedSizes, needsFetching int
+	// Filter videos that have direct URLs and file sizes
+	var downloadableVideos []Video
+	var totalSize int64
+	var videosWithoutURL, videosWithoutSize int
+
 	for _, video := range videos {
-		if video.FileSize > 0 {
-			cachedSizes++
-		} else if video.DirectURL != "" {
-			needsFetching++
+		if video.DirectURL == "" {
+			videosWithoutURL++
+			continue
+		}
+		if video.FileSize <= 0 {
+			videosWithoutSize++
+			continue
+		}
+		downloadableVideos = append(downloadableVideos, video)
+		totalSize += video.FileSize
+	}
+
+	fmt.Printf("📊 Download Summary:\n")
+	fmt.Printf("   Total videos in channel: %d\n", len(videos))
+	fmt.Printf("   Videos ready for download: %d\n", len(downloadableVideos))
+	if videosWithoutURL > 0 {
+		fmt.Printf("   Videos without direct URLs: %d (run 'banned fetch' first)\n", videosWithoutURL)
+	}
+	if videosWithoutSize > 0 {
+		fmt.Printf("   Videos without file sizes: %d (run 'banned fetch file-sizes' first)\n", videosWithoutSize)
+	}
+	fmt.Printf("   Total download size: %s\n\n", formatFileSize(totalSize))
+
+	if len(downloadableVideos) == 0 {
+		fmt.Println("No videos ready for download. Make sure to run fetch commands first.")
+		return nil
+	}
+
+	// Get download directory from config
+	downloadDir, err := getDownloadDirectory()
+	if err != nil {
+		return fmt.Errorf("failed to get download directory: %w", err)
+	}
+
+	fmt.Printf("📁 Download directory: %s\n\n", downloadDir)
+
+	// Prompt user for confirmation unless force flag is used
+	if !force {
+		fmt.Printf("Do you want to proceed with downloading %d videos (%s)? [y/N]: ", len(downloadableVideos), formatFileSize(totalSize))
+		reader := bufio.NewReader(os.Stdin)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("failed to read user input: %w", err)
+		}
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response != "y" && response != "yes" {
+			fmt.Println("Download cancelled.")
+			return nil
 		}
 	}
 
-	fmt.Printf("Found %d videos (%d cached, %d need fetching)...\n\n", len(videos), cachedSizes, needsFetching)
+	// Start downloading
+	fmt.Printf("\n🚀 Starting download of %d videos...\n\n", len(downloadableVideos))
+	return downloadVideos(downloadableVideos, downloadDir)
+}
 
-	// Stats tracking
-	var cachedCount, fetchedCount int64
+// downloadVideos downloads a list of videos concurrently
+func downloadVideos(videos []Video, downloadDir string) error {
+	// Create download directory if it doesn't exist
+	if err := os.MkdirAll(downloadDir, 0755); err != nil {
+		return fmt.Errorf("failed to create download directory: %w", err)
+	}
 
-	// Create channels for concurrent processing
-	videoInfoChan := make(chan VideoInfo, len(videos))
+	// Use semaphore to limit concurrent downloads
+	semaphore := make(chan struct{}, 3) // Limit to 3 concurrent downloads
 	var wg sync.WaitGroup
+	var successCount, errorCount int64
 
-	// Limit concurrent requests to avoid overwhelming servers
-	semaphore := make(chan struct{}, 10)
-
-	// Process each video concurrently
-	for _, video := range videos {
-		if video.DirectURL == "" {
-			continue // Skip videos without direct URLs
-		}
-
+	for i, video := range videos {
 		wg.Add(1)
-		go func(v Video) {
+		go func(index int, v Video) {
 			defer wg.Done()
 
-			info := VideoInfo{
-				ID:        v.ID,
-				Title:     v.Title,
-				DirectURL: v.DirectURL,
-			}
-
-			// Check if we already have file size from database
-			if v.FileSize > 0 {
-				info.FileSize = v.FileSize
-				info.Error = nil
-				if showStats {
-					cachedCount++
-				}
-				videoInfoChan <- info
-				return
-			}
-
-			// Acquire semaphore for HTTP request
+			// Acquire semaphore
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			// Get file size from HTTP request
-			size, err := getFileSize(v.DirectURL)
-			info.FileSize = size
-			info.Error = err
+			// Create safe filename
+			filename := sanitizeFilename(v.Title) + ".mp4"
+			filePath := filepath.Join(downloadDir, filename)
 
-			// Update database with file size if successful
-			if err == nil && size > 0 {
-				if showStats {
-					fetchedCount++
-				}
-				if updateErr := UpdateVideoFileSize(v.ID, size); updateErr != nil {
-					// Don't fail the whole operation, just log the error
-					fmt.Printf("Warning: Failed to update file size in database for video %s: %v\n", v.ID, updateErr)
-				}
+			fmt.Printf("[%d/%d] Downloading: %s\n", index+1, len(videos), v.Title)
+
+			if err := downloadVideoFile(v.DirectURL, filePath); err != nil {
+				fmt.Printf("❌ Failed to download %s: %v\n", v.Title, err)
+				errorCount++
+			} else {
+				fmt.Printf("✅ Downloaded: %s\n", filename)
+				successCount++
 			}
-
-			videoInfoChan <- info
-		}(video)
+		}(i, video)
 	}
 
-	// Close channel when all goroutines complete
-	go func() {
-		wg.Wait()
-		close(videoInfoChan)
-	}()
+	wg.Wait()
 
-	// Collect and display results
-	var totalSize int64
-	successCount := 0
-
-	fmt.Printf("%-50s %-15s %s\n", "Title", "Size", "URL")
-	fmt.Printf("%-50s %-15s %s\n", "-----", "----", "---")
-
-	for info := range videoInfoChan {
-		titleTrunc := info.Title
-		if len(titleTrunc) > 47 {
-			titleTrunc = titleTrunc[:47] + "..."
-		}
-
-		if info.Error != nil {
-			fmt.Printf("%-50s %-15s %s (Error: %v)\n", titleTrunc, "Unknown", info.DirectURL, info.Error)
-		} else {
-			sizeStr := formatFileSize(info.FileSize)
-			fmt.Printf("%-50s %-15s %s\n", titleTrunc, sizeStr, info.DirectURL)
-			totalSize += info.FileSize
-			successCount++
-		}
-	}
-
-	fmt.Printf("\n📊 Summary:\n")
-	fmt.Printf("   Videos processed: %d\n", len(videos))
+	fmt.Printf("\n🎉 Download complete!\n")
 	fmt.Printf("   Successful: %d\n", successCount)
-	fmt.Printf("   Total size: %s\n", formatFileSize(totalSize))
-
-	if showStats {
-		cached := atomic.LoadInt64(&cachedCount)
-		fetched := atomic.LoadInt64(&fetchedCount)
-		fmt.Printf("\n📈 Performance Stats:\n")
-		fmt.Printf("   Cached from DB: %d\n", cached)
-		fmt.Printf("   Fetched via HTTP: %d\n", fetched)
-		if cached+fetched > 0 {
-			cacheRatio := float64(cached) / float64(cached+fetched) * 100
-			fmt.Printf("   Cache hit ratio: %.1f%%\n", cacheRatio)
-		}
-	}
+	fmt.Printf("   Failed: %d\n", errorCount)
+	fmt.Printf("   Total: %d\n", len(videos))
 
 	return nil
 }
 
-// getFileSize gets the content length of a URL using HEAD request
-func getFileSize(url string) (int64, error) {
-	client := &http.Client{
-		Timeout: 10 * time.Second,
+// downloadVideoFile downloads a video file from URL to the specified path
+func downloadVideoFile(url, filepath string) error {
+	// Check if file already exists
+	if _, err := os.Stat(filepath); err == nil {
+		return nil // File already exists, skip
 	}
 
-	resp, err := client.Head(url)
+	client := &http.Client{
+		Timeout: 30 * time.Minute, // Long timeout for video downloads
+	}
+
+	resp, err := client.Get(url)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	contentLength := resp.Header.Get("Content-Length")
-	if contentLength == "" {
-		return 0, fmt.Errorf("no content-length header")
-	}
-
-	size, err := strconv.ParseInt(contentLength, 10, 64)
+	// Create the file
+	file, err := os.Create(filepath)
 	if err != nil {
-		return 0, fmt.Errorf("invalid content-length: %s", contentLength)
+		return err
 	}
+	defer file.Close()
 
-	return size, nil
+	// Copy the response body to file
+	_, err = io.Copy(file, resp.Body)
+	return err
 }
 
-// formatFileSize formats bytes into human readable format
-func formatFileSize(bytes int64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
+// sanitizeFilename removes or replaces invalid characters for filenames
+func sanitizeFilename(filename string) string {
+	// Replace invalid characters with underscores
+	invalidChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
+	for _, char := range invalidChars {
+		filename = strings.ReplaceAll(filename, char, "_")
 	}
-	div, exp := int64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
+	// Limit length to avoid filesystem issues
+	if len(filename) > 200 {
+		filename = filename[:200]
 	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	return filename
+}
+
+// getDownloadDirectory gets the download directory from config or uses default
+func getDownloadDirectory() (string, error) {
+	var downloadDir string
+
+	// Try to get from config first
+	if configDir, err := GetSetting("download_dir"); err == nil && configDir != "" {
+		downloadDir = configDir
+	} else {
+		// Default to ./downloads in current directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		downloadDir = filepath.Join(cwd, "downloads")
+	}
+
+	// Expand tilde (~) to home directory if present
+	if strings.HasPrefix(downloadDir, "~/") {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get home directory: %w", err)
+		}
+		downloadDir = filepath.Join(homeDir, downloadDir[2:])
+	}
+
+	// Create the directory if it doesn't exist
+	if err := os.MkdirAll(downloadDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create download directory %s: %w", downloadDir, err)
+	}
+
+	return downloadDir, nil
 }
 
 func init() {
 	rootCmd.AddCommand(downloadCmd)
 
 	// Add flags
-	downloadCmd.Flags().BoolP("stats", "s", false, "Show performance statistics (cached vs fetched file sizes)")
+	downloadCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt and start downloading immediately")
 }

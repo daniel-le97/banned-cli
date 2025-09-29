@@ -1,15 +1,13 @@
 {
   "data": {
     "getChannel": {
-      "_id": "65d4e94b0d63da299e20d401",
-      "title": "INFO SKITS",
-      "summary": "The lighter side of the Infowar. Powerful comedy to educate and elighten. ",
-      "avatar": "https://download.assets.video/images/841bc74f-4214-4ba5-9b0e-78e004bde76d-large.png",
-      "coverImage": "https://download.assets.video/images/f2f0cbe8-4ae7-4338-9fab-8b06693fa5d8-large.jpg",
-      "totalVideos": 17,
+      "_id": "5ba55a9155cd25751b7f3628",
+      "title": "Testing",
+      "summary": "This is a testing channel. Do not use for public consumption!",
+      "totalVideos": 57,
       "videos": [
         {
-          "_id": "6610295cf84009538741a87d",
+          "_id": "6669fb4c0a06dbb75a95303d",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -18,7 +16,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65f8f659961a509804ac5a64",
+          "_id": "6669f39de19ea586f419dfc9",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -27,7 +25,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65ea53d033765d69399c84ba",
+          "_id": "663a48b255690c9408fa3def",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -36,7 +34,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65ea207033765d6939961b31",
+          "_id": "6148f0085762b3d3cb65d0e3",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -45,7 +43,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65dce40d5cb0cf8980b41af2",
+          "_id": "6148dc49efd7030e0c0b82bf",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -54,7 +52,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65dccbc75cb0cf8980b40339",
+          "_id": "601d863dee1db0260e40ec49",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -63,7 +61,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65d8e062e2affd7a7323344a",
+          "_id": "5d2a6b92040e4f001829b5ab",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -72,7 +70,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65d8ddece2affd7a73232a28",
+          "_id": "5d0138bbe588f900120ca99c",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -81,7 +79,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65d8d96ae2affd7a73232952",
+          "_id": "5ceab5ebb4aa040012cf58c6",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -90,7 +88,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65d8d78be2affd7a732328fe",
+          "_id": "5ce5d323dfafa200178bb0b8",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -99,7 +97,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65d7f0e3e2affd7a7322355f",
+          "_id": "5cc63006d630f10012ea98bc",
           "title": "",
           "summary": "",
           "largeImage": "",
@@ -108,7 +106,7 @@
           "directUrl": ""
         },
         {
-          "_id": "65d7ef20e2affd7a73220578",
+          "_id": "5cc4a8bca67b59002179fd75",
           "title": "",
           "summary": "",
           "largeImage": "",

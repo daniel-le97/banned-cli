@@ -5,12 +5,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/daniel-le97/banned-cli/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -109,10 +108,52 @@ Examples:
 
 		fmt.Printf("✅ Successfully fetched and stored channel details!\n")
 
-		// Fetch videos for this channel
+		// Get channel details to check total video count
+		channel, err := GetChannelByID(channelID)
+		if err != nil {
+			fmt.Printf("⚠️ Failed to get channel details from database: %v\n", err)
+			return
+		}
+
+		// Count videos currently in database for this channel
+		currentVideoCount, err := CountVideosForChannel(channelID)
+		if err != nil {
+			fmt.Printf("⚠️ Failed to count videos in database: %v\n", err)
+			return
+		}
+
+		fmt.Printf("📊 Channel '%s' has %.0f total videos (API) vs %d in database\n",
+			channel.Title, channel.TotalVideos, currentVideoCount)
+
+		// Check if we need to fetch videos
 		fetchAll, _ := cmd.Flags().GetBool("all")
+		var shouldFetch bool
+		var fetchReason string
+
+		if fetchAll {
+			// For --all flag, fetch if we have fewer videos than the channel's total
+			totalVideos := int(channel.TotalVideos)
+			if currentVideoCount < totalVideos {
+				shouldFetch = true
+				fetchReason = fmt.Sprintf("missing %d videos", totalVideos-currentVideoCount)
+			} else {
+				fetchReason = "all videos already in database"
+			}
+		} else {
+			// For regular fetch (50 videos), always fetch to get latest
+			shouldFetch = true
+			fetchReason = "fetching latest 50 videos"
+		}
+
+		if !shouldFetch {
+			fmt.Printf("✅ Skipping video fetch: %s\n", fetchReason)
+			return
+		}
+
+		fmt.Printf("🔄 %s - proceeding with fetch...\n", fetchReason)
+
+		// Fetch videos for this channel
 		var videos []Video
-		var err error
 
 		if fetchAll {
 			// Fetch all videos recursively
@@ -257,69 +298,302 @@ Examples:
 			return
 		}
 
-		var pkgs []string
+		// Use fast worker pool for maximum speed
+		fmt.Printf("📏 Found %d videos without file sizes. Starting maximum speed fetch...\n", len(videos))
+
+		var urls []string
 		for _, v := range videos {
-			pkgs = append(pkgs, v.DirectURL)
+			if v.DirectURL != "" {
+				urls = append(urls, v.DirectURL)
+			}
 		}
 
-		fmt.Printf("📏 Found %d videos without file sizes. Starting fetch...\n", len(videos))
-		if _, err := tea.NewProgram(tui.NewPackageManagerModel("fetch", pkgs, fetchFunc)).Run(); err != nil {
-			fmt.Println("Error running program:", err)
-			os.Exit(1)
-		}
-		// fetchVideoFileSizes(videos)
+		// Process with worker pool
+		processFileSizesWithWorkerPool(urls)
 		fmt.Printf("✅ File size fetching completed!\n")
 	},
 }
 
-func fetchFunc(pkg string) tea.Cmd {
-	returnFunc := func() tea.Msg {
-		return tui.InstalledPkgMsg(pkg)
+// processFileSizesWithWorkerPool uses a worker pool for maximum concurrency and speed
+func processFileSizesWithWorkerPool(urls []string) {
+	const numWorkers = 100 // High concurrency for speed
+
+	totalURLs := len(urls)
+	if totalURLs == 0 {
+		return
 	}
-	size, err := getFileSize(pkg)
-	if err != nil {
-		return returnFunc
+
+	// Channels for work distribution and progress tracking
+	urlChan := make(chan string, totalURLs)
+	resultsChan := make(chan result, totalURLs)
+
+	// Statistics tracking
+	var (
+		completed    int64
+		failed       int64
+		timeouts     int64
+		networkErrs  int64
+		databaseErrs int64
+		httpErrs     int64
+	)
+
+	startTime := time.Now()
+
+	// Start worker goroutines
+	var wg sync.WaitGroup
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+
+			for url := range urlChan {
+				result := processURL(url)
+				resultsChan <- result
+			}
+		}(i)
 	}
-	_, err = GetDB()
-	if err != nil {
-		time.Sleep(500 * time.Millisecond)
-		fetchFunc(pkg)
+
+	// Send URLs to workers
+	go func() {
+		for _, url := range urls {
+			urlChan <- url
+		}
+		close(urlChan)
+	}()
+
+	// Close results channel when all workers are done
+	go func() {
+		wg.Wait()
+		close(resultsChan)
+	}()
+
+	// Progress reporting
+	progressTicker := time.NewTicker(2 * time.Second)
+	defer progressTicker.Stop()
+
+	processedCount := 0
+
+	// Collect results and show progress
+	for {
+		select {
+		case result, ok := <-resultsChan:
+			if !ok {
+				// All results processed
+				goto done
+			}
+
+			processedCount++
+
+			// Update statistics based on result
+			if result.Success {
+				atomic.AddInt64(&completed, 1)
+			} else {
+				atomic.AddInt64(&failed, 1)
+				switch result.ErrorType {
+				case "timeout":
+					atomic.AddInt64(&timeouts, 1)
+				case "network":
+					atomic.AddInt64(&networkErrs, 1)
+				case "database":
+					atomic.AddInt64(&databaseErrs, 1)
+				case "http":
+					atomic.AddInt64(&httpErrs, 1)
+				}
+
+				// Print error details immediately
+				fmt.Printf("❌ %s: %s\n", result.ErrorType, result.URL)
+			}
+
+		case <-progressTicker.C:
+			// Show progress every 2 seconds
+			elapsed := time.Since(startTime)
+			rate := float64(processedCount) / elapsed.Seconds()
+			eta := time.Duration(float64(totalURLs-processedCount)/rate) * time.Second
+
+			fmt.Printf("\r📏 Progress: %d/%d (%.1f%%) | ⚡ %.1f/sec | ⏱️ ETA: %v | ✅ %d | ❌ %d",
+				processedCount, totalURLs,
+				float64(processedCount)/float64(totalURLs)*100,
+				rate, eta.Round(time.Second),
+				atomic.LoadInt64(&completed), atomic.LoadInt64(&failed))
+		}
 	}
-	UpdateVideoFileSizeByURL(pkg, size)
-	return returnFunc
+
+done:
+	elapsed := time.Since(startTime)
+	completedFinal := atomic.LoadInt64(&completed)
+	failedFinal := atomic.LoadInt64(&failed)
+
+	fmt.Printf("\n\n🎉 Completed in %v!\n", elapsed.Round(time.Second))
+	fmt.Printf("✅ Successful: %d\n", completedFinal)
+	fmt.Printf("❌ Failed: %d\n", failedFinal)
+
+	if failedFinal > 0 {
+		fmt.Printf("\nError breakdown:\n")
+		if t := atomic.LoadInt64(&timeouts); t > 0 {
+			fmt.Printf("  ⏱️ Timeouts: %d\n", t)
+		}
+		if n := atomic.LoadInt64(&networkErrs); n > 0 {
+			fmt.Printf("  🌐 Network errors: %d\n", n)
+		}
+		if h := atomic.LoadInt64(&httpErrs); h > 0 {
+			fmt.Printf("  🌍 HTTP errors: %d\n", h)
+		}
+		if d := atomic.LoadInt64(&databaseErrs); d > 0 {
+			fmt.Printf("  💾 Database errors: %d\n", d)
+		}
+	}
 }
 
-// fetchVideoFileSizes fetches file sizes for videos concurrently
-func fetchVideoFileSizes(videos []Video) {
+// result represents the outcome of processing a URL
+type result struct {
+	URL       string
+	Success   bool
+	ErrorType string
+	Error     error
+}
+
+// processURL handles fetching and updating file size for a single URL
+func processURL(url string) result {
+	size, err := getFileSize(url)
+	if err != nil {
+		// Quick retry on failure
+		time.Sleep(50 * time.Millisecond)
+		size, err = getFileSize(url)
+		if err != nil {
+			// Classify error type
+			errorStr := err.Error()
+			errorType := "network"
+			if strings.Contains(errorStr, "timeout") || strings.Contains(errorStr, "deadline") {
+				errorType = "timeout"
+			} else if strings.Contains(errorStr, "HTTP") {
+				errorType = "http"
+			}
+
+			return result{
+				URL:       url,
+				Success:   false,
+				ErrorType: errorType,
+				Error:     err,
+			}
+		}
+	}
+
+	if err == nil && size > 0 {
+		if updateErr := UpdateVideoFileSizeByURL(url, size); updateErr != nil {
+			return result{
+				URL:       url,
+				Success:   false,
+				ErrorType: "database",
+				Error:     updateErr,
+			}
+		}
+	}
+
+	return result{
+		URL:     url,
+		Success: true,
+	}
+}
+
+// fetchVideoFileSizesConcurrent fetches file sizes for videos with high concurrency and batching
+func fetchVideoFileSizesConcurrent(videos []Video) {
+	const (
+		maxConcurrency = 50  // Higher concurrency for speed
+		batchSize      = 500 // Process in batches for progress updates
+		maxRetries     = 2   // Retry failed requests
+	)
+
+	totalVideos := 0
+	for _, video := range videos {
+		if video.DirectURL != "" {
+			totalVideos++
+		}
+	}
+
+	if totalVideos == 0 {
+		return
+	}
+
+	processed := 0
+	failed := 0
+	startTime := time.Now()
+
+	// Process videos in batches
+	for i := 0; i < len(videos); i += batchSize {
+		end := i + batchSize
+		if end > len(videos) {
+			end = len(videos)
+		}
+		batch := videos[i:end]
+
+		// Process current batch
+		batchProcessed, batchFailed := processBatch(batch, maxConcurrency, maxRetries)
+		processed += batchProcessed
+		failed += batchFailed
+
+		// Progress update
+		elapsed := time.Since(startTime)
+		rate := float64(processed) / elapsed.Seconds()
+		eta := time.Duration(float64(totalVideos-processed)/rate) * time.Second
+
+		fmt.Printf("\r📏 Progress: %d/%d (%.1f%%) | Rate: %.1f/sec | Failed: %d | ETA: %v",
+			processed, totalVideos, float64(processed)/float64(totalVideos)*100,
+			rate, failed, eta.Round(time.Second))
+	}
+	fmt.Printf("\n")
+}
+
+// processBatch processes a batch of videos concurrently
+func processBatch(videos []Video, maxConcurrency, maxRetries int) (processed, failed int) {
 	var wg sync.WaitGroup
-	semaphore := make(chan struct{}, 10) // Limit concurrent requests
+	semaphore := make(chan struct{}, maxConcurrency)
+	var processedCount, failedCount int64
 
 	for _, video := range videos {
 		if video.DirectURL == "" {
-			continue // Skip videos without direct URLs
+			continue
 		}
 
 		wg.Add(1)
 		go func(v Video) {
 			defer wg.Done()
 
-			// Acquire semaphore for HTTP request
+			// Acquire semaphore
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			// Get file size from HTTP request
-			size, err := getFileSize(v.DirectURL)
-			if err == nil && size > 0 {
-				// Update database with file size
-				if updateErr := UpdateVideoFileSizeByURL(v.DirectURL, size); updateErr != nil {
-					// Don't fail the whole operation, just continue
-					fmt.Printf("Warning: Failed to update file size in database for video %s: %v\n", v.ID, updateErr)
+			// Try to get file size with retries
+			var size int64
+			var err error
+			for retry := 0; retry <= maxRetries; retry++ {
+				size, err = getFileSize(v.DirectURL)
+				if err == nil {
+					break
 				}
+				if retry < maxRetries {
+					time.Sleep(time.Duration(retry+1) * 100 * time.Millisecond)
+				}
+			}
+
+			if err == nil && size > 0 {
+				if updateErr := UpdateVideoFileSizeByURL(v.DirectURL, size); updateErr == nil {
+					atomic.AddInt64(&processedCount, 1)
+				} else {
+					atomic.AddInt64(&failedCount, 1)
+				}
+			} else {
+				atomic.AddInt64(&failedCount, 1)
 			}
 		}(video)
 	}
 
 	wg.Wait()
+	return int(atomic.LoadInt64(&processedCount)), int(atomic.LoadInt64(&failedCount))
+}
+
+// fetchVideoFileSizes fetches file sizes for videos concurrently (legacy function)
+func fetchVideoFileSizes(videos []Video) {
+	fetchVideoFileSizesConcurrent(videos)
 }
 
 func init() {
