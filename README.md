@@ -1,4 +1,4 @@
-# Banned - banned.video Content Manager
+# Banned - banned.video Content Manager - DO NOT USE THIS BRANCH I WILL BE MOVING BACK TO SQLITE
 
 A comprehensive command-line tool for downloading and managing content from https://banned.video. This tool provides an interactive Terminal User Interface (TUI) for browsing channels, fetching video metadata, and managing downloads with advanced features like recursive fetching and torrent creation.
 
