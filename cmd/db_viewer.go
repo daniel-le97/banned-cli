@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/daniel-le97/banned-cli/db"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/daniel-le97/banned-cli/db"
 )
 
 // Database viewer styles
@@ -25,23 +27,17 @@ var (
 			Bold(true).
 			Padding(0, 1)
 
-	titleBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#7D56F4")).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Padding(0, 1).
-			Bold(true)
-
-	statusBarStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#3C3C3C")).
-			Foreground(lipgloss.Color("#FFFFFF")).
+	dbTitleStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FFFDF5")).
+			Background(lipgloss.Color("#25A065")).
+			Bold(true).
 			Padding(0, 1)
-
-	dbHelpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#626262"))
 )
 
-// Database bucket names and their display names
-var dbBuckets = map[string]string{
+// Database buckets
+var dbBuckets = []string{"settings", "channels", "videos", "downloads"}
+
+var dbBucketTitles = map[string]string{
 	"settings":  "Settings",
 	"channels":  "Channels",
 	"videos":    "Videos",
@@ -49,77 +45,86 @@ var dbBuckets = map[string]string{
 }
 
 type databaseViewModel struct {
-	db            *bolt.DB
-	table         table.Model
-	currentBucket string
-	buckets       []string
-	bucketIndex   int
-	width         int
-	height        int
-	error         error
-	rawData       []interface{} // Store raw data for selected rows
+	db             *bolt.DB
+	table          table.Model
+	currentBucket  int
+	width          int
+	height         int
+	rawData        []interface{}
+	error          error
+	keys           keyMap
+	showDetails    bool
+	currentDetails string
+	detailsText    string
 }
 
 type keyMap struct {
-	Up    key.Binding
-	Down  key.Binding
-	Left  key.Binding
-	Right key.Binding
-	Tab   key.Binding
-	Enter key.Binding
-	Quit  key.Binding
-	Help  key.Binding
+	Up     key.Binding
+	Down   key.Binding
+	Left   key.Binding
+	Right  key.Binding
+	Tab    key.Binding
+	Enter  key.Binding
+	Toggle key.Binding
+	Quit   key.Binding
+	Help   key.Binding
 }
 
-var keys = keyMap{
-	Up: key.NewBinding(
-		key.WithKeys("k", "up"),
-		key.WithHelp("↑/k", "move up"),
-	),
-	Down: key.NewBinding(
-		key.WithKeys("j", "down"),
-		key.WithHelp("↓/j", "move down"),
-	),
-	Left: key.NewBinding(
-		key.WithKeys("h", "left"),
-		key.WithHelp("←/h", "previous bucket"),
-	),
-	Right: key.NewBinding(
-		key.WithKeys("l", "right"),
-		key.WithHelp("→/l", "next bucket"),
-	),
-	Tab: key.NewBinding(
-		key.WithKeys("tab"),
-		key.WithHelp("tab", "switch bucket"),
-	),
-	Enter: key.NewBinding(
-		key.WithKeys("enter", "space"),
-		key.WithHelp("enter/space", "print selected"),
-	),
-	Quit: key.NewBinding(
-		key.WithKeys("q", "ctrl+c"),
-		key.WithHelp("q/ctrl+c", "quit"),
-	),
-	Help: key.NewBinding(
-		key.WithKeys("?"),
-		key.WithHelp("?", "help"),
-	),
+func newKeyMap() keyMap {
+	return keyMap{
+		Up: key.NewBinding(
+			key.WithKeys("k", "up"),
+			key.WithHelp("↑/k", "move up"),
+		),
+		Down: key.NewBinding(
+			key.WithKeys("j", "down"),
+			key.WithHelp("↓/j", "move down"),
+		),
+		Left: key.NewBinding(
+			key.WithKeys("h", "left"),
+			key.WithHelp("←/h", "previous bucket"),
+		),
+		Right: key.NewBinding(
+			key.WithKeys("l", "right"),
+			key.WithHelp("→/l", "next bucket"),
+		),
+		Tab: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("tab", "switch bucket"),
+		),
+		Enter: key.NewBinding(
+			key.WithKeys("enter", " "),
+			key.WithHelp("enter/space", "view details"),
+		),
+		Toggle: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "toggle details panel"),
+		),
+		Quit: key.NewBinding(
+			key.WithKeys("q", "ctrl+c"),
+			key.WithHelp("q", "quit"),
+		),
+		Help: key.NewBinding(
+			key.WithKeys("?"),
+			key.WithHelp("?", "help"),
+		),
+	}
+}
+
+// copyToClipboard copies text to the system clipboard using a pure Go library
+func copyToClipboard(text string) error {
+	return clipboard.WriteAll(text)
 }
 
 func newDatabaseViewModel(database *bolt.DB) *databaseViewModel {
-	// Ensure settings is first since we know it has data
-	buckets := []string{"settings", "channels", "videos", "downloads"}
-
 	m := &databaseViewModel{
 		db:            database,
-		buckets:       buckets,
-		currentBucket: "settings",
-		bucketIndex:   0,
+		currentBucket: 0,
+		keys:          newKeyMap(),
+		showDetails:   false,
+		detailsText:   "Select an item from the table above to view its details here.",
 	}
-
-	// Initialize with the settings bucket
-	m.loadBucket(m.currentBucket)
-
+	m.loadBucket(dbBuckets[0])
 	return m
 }
 
@@ -128,131 +133,223 @@ func (m *databaseViewModel) Init() tea.Cmd {
 }
 
 func (m *databaseViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// Use more of the terminal space - account for title (1) + status bar (1) + margins (1)
-		tableHeight := m.height - 3
+		// Calculate layout dimensions
+		var tableHeight, textAreaHeight int
+
+		if m.showDetails {
+			// Split screen: 60% table, 40% text area
+			tableHeight = int(float64(m.height-4) * 0.6)
+			textAreaHeight = m.height - tableHeight - 6
+		} else {
+			// Full screen for table
+			tableHeight = m.height - 4
+			textAreaHeight = 0
+		}
+
 		if tableHeight < 5 {
 			tableHeight = 5
 		}
-
-		// Use nearly full width, just leave small margins
-		m.table.SetWidth(m.width - 2)
-		m.table.SetHeight(tableHeight)
-		return m, nil
-
-	case tea.MouseMsg:
-		if msg.Type == tea.MouseLeft {
-			// Handle mouse clicks on table rows
-			var cmd tea.Cmd
-			m.table, cmd = m.table.Update(msg)
-			return m, cmd
+		if textAreaHeight < 3 && m.showDetails {
+			textAreaHeight = 3
+		} // Update table dimensions
+		if m.table.Width() == 0 {
+			m.table = m.table
+		} else {
+			m.table.SetWidth(m.width - 4)
+			m.table.SetHeight(tableHeight)
 		}
+
+		// Text area dimensions will be handled by rendering
+
+		// Reload bucket to recalculate column widths
+		m.loadBucket(dbBuckets[m.currentBucket])
 
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, keys.Quit):
-			return m, tea.Quit
-
-		case key.Matches(msg, keys.Enter):
-			// Print selected row data to console
-			m.printSelectedItem()
-			return m, nil
-
-		case key.Matches(msg, keys.Left), key.Matches(msg, keys.Tab):
-			m.bucketIndex--
-			if m.bucketIndex < 0 {
-				m.bucketIndex = len(m.buckets) - 1
+		// Handle clipboard copy when in details view
+		if m.showDetails {
+			switch msg.Type {
+			case tea.KeyEnter, tea.KeyCtrlC:
+				if m.currentDetails != "" {
+					if err := copyToClipboard(m.currentDetails); err != nil {
+						fmt.Printf("Failed to copy to clipboard: %v\n", err)
+					} else {
+						fmt.Printf("✅ Copied to clipboard!\n")
+					}
+				}
+				return m, nil
 			}
-			m.currentBucket = m.buckets[m.bucketIndex]
-			m.loadBucket(m.currentBucket)
-			return m, nil
-
-		case key.Matches(msg, keys.Right):
-			m.bucketIndex++
-			if m.bucketIndex >= len(m.buckets) {
-				m.bucketIndex = 0
-			}
-			m.currentBucket = m.buckets[m.bucketIndex]
-			m.loadBucket(m.currentBucket)
-			return m, nil
 		}
 
-		// Pass other keys to the table
-		var cmd tea.Cmd
-		m.table, cmd = m.table.Update(msg)
-		return m, cmd
+		switch {
+		case key.Matches(msg, m.keys.Quit):
+			return m, tea.Quit
+
+		case key.Matches(msg, m.keys.Left):
+			m.currentBucket--
+			if m.currentBucket < 0 {
+				m.currentBucket = len(dbBuckets) - 1
+			}
+			m.loadBucket(dbBuckets[m.currentBucket])
+			return m, nil
+
+		case key.Matches(msg, m.keys.Right):
+			m.currentBucket++
+			if m.currentBucket >= len(dbBuckets) {
+				m.currentBucket = 0
+			}
+			m.loadBucket(dbBuckets[m.currentBucket])
+			return m, nil
+
+		case key.Matches(msg, m.keys.Toggle):
+			m.showDetails = !m.showDetails
+			// Trigger a resize to recalculate layout
+			return m, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+			}
+
+		case key.Matches(msg, m.keys.Enter):
+			m.updateDetailsArea()
+			if !m.showDetails {
+				m.showDetails = true
+				// Trigger a resize to show the details area
+				return m, func() tea.Msg {
+					return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+				}
+			}
+			return m, nil
+		}
 	}
 
+	// Update components
+	var cmds []tea.Cmd
+
+	// Update table
+	m.table, cmd = m.table.Update(msg)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+
+	// No textarea updates needed for simple text rendering
+
+	if len(cmds) > 0 {
+		return m, tea.Batch(cmds...)
+	}
 	return m, nil
 }
 
 func (m *databaseViewModel) View() string {
 	if m.error != nil {
-		return fmt.Sprintf("❌ Error: %v\nPress 'q' to quit.", m.error)
+		return fmt.Sprintf("Error: %v\n\nPress 'q' to quit.", m.error)
 	}
 
-	recordCount := len(m.table.Rows())
-	if recordCount == 0 {
-		return fmt.Sprintf("📵 Bucket '%s' is empty\n\nPress ←/→ to switch buckets or 'q' to quit.", dbBuckets[m.currentBucket])
+	if len(m.rawData) == 0 {
+		return fmt.Sprintf("Bucket '%s' is empty\n\nPress ←/→ to switch buckets or 'q' to quit.", dbBuckets[m.currentBucket])
 	}
 
-	// Title bar - use full width
-	titleText := fmt.Sprintf(" 📊 Database Viewer - %s (%d records) ", dbBuckets[m.currentBucket], recordCount)
-	titleBar := titleBarStyle.Width(m.width).Render(titleText)
+	var view strings.Builder
 
-	// Table view - use full available space
-	tableView := m.table.View()
+	// Title
+	title := fmt.Sprintf("Database Viewer - %s (%d items)",
+		dbBucketTitles[dbBuckets[m.currentBucket]], len(m.rawData))
+	view.WriteString(dbTitleStyle.Render(title))
+	view.WriteString("\n\n")
 
-	// Status bar with navigation help - use full width
-	statusText := fmt.Sprintf(" ←/→: Switch buckets | ↑/↓: Navigate rows | Enter/Space: Print selected | q: Quit | Current: %s ", m.currentBucket)
-	statusBar := statusBarStyle.Width(m.width).Render(statusText)
+	// Table
+	view.WriteString(baseStyle.Render(m.table.View()))
 
-	return fmt.Sprintf("%s\n%s\n%s", titleBar, tableView, statusBar)
+	// Details area if enabled
+	if m.showDetails {
+		view.WriteString("\n\n")
+		view.WriteString(headerStyle.Render("Details (Press Enter or Ctrl+C to copy, mouse selection works too!)"))
+		view.WriteString("\n")
+		// Render details as simple selectable text (no borders like your working example)
+		view.WriteString(m.detailsText)
+	}
+
+	// Help
+	view.WriteString("\n")
+	helpText := "←/→ switch buckets • ↑/↓ navigate • enter view details • d toggle details • q quit"
+	if m.showDetails {
+		helpText = "←/→ switch buckets • ↑/↓ navigate • enter/ctrl+c copy all • d toggle • q quit"
+	}
+	view.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render(helpText))
+
+	return view.String()
 }
 
-// printSelectedItem prints the selected row's raw data to stdout
-func (m *databaseViewModel) printSelectedItem() {
+// updateDetailsArea updates the details text with the selected item's details
+func (m *databaseViewModel) updateDetailsArea() {
 	selectedRow := m.table.Cursor()
 	if selectedRow < 0 || selectedRow >= len(m.rawData) {
-		fmt.Printf("No item selected or invalid selection\n")
+		m.currentDetails = "No item selected"
+		m.detailsText = m.currentDetails
 		return
 	}
 
 	selectedData := m.rawData[selectedRow]
+	details := m.formatItemDetails(selectedData, selectedRow+1)
+	m.currentDetails = details
+	m.detailsText = details
+}
 
-	fmt.Printf("\n" + strings.Repeat("=", 80) + "\n")
-	fmt.Printf("Selected %s Record #%d:\n", dbBuckets[m.currentBucket], selectedRow+1)
-	fmt.Printf(strings.Repeat("=", 80) + "\n")
+// formatItemDetails formats the selected item's data into a readable string
+func (m *databaseViewModel) formatItemDetails(selectedData interface{}, rowNum int) string {
+	var details strings.Builder
+
+	details.WriteString(fmt.Sprintf("--- %s #%d ---\n\n", dbBuckets[m.currentBucket], rowNum))
 
 	switch data := selectedData.(type) {
 	case map[string]string:
-		// Settings data
 		for key, value := range data {
-			fmt.Printf("Key: %s\n", key)
-			fmt.Printf("Value: %s\n", value)
-			fmt.Printf(strings.Repeat("-", 40) + "\n")
+			details.WriteString(fmt.Sprintf("%s: %s\n", key, value))
 		}
+
 	case db.Channel:
-		// Channel data
-		prettyJSON, _ := json.MarshalIndent(data, "", "  ")
-		fmt.Printf("%s\n", string(prettyJSON))
+		details.WriteString(fmt.Sprintf("ID: %s\n", data.ID))
+		details.WriteString(fmt.Sprintf("Title: %s\n", data.Title))
+		if data.Summary != "" {
+			details.WriteString(fmt.Sprintf("Summary: %s\n", data.Summary))
+		}
+		details.WriteString(fmt.Sprintf("Videos: %.0f | Views: %.0f | Likes: %.0f | Live: %t\n",
+			data.TotalVideos, data.TotalVideoViews, data.TotalLikes, data.IsLive))
+
 	case db.Video:
-		// Video data
-		prettyJSON, _ := json.MarshalIndent(data, "", "  ")
-		fmt.Printf("%s\n", string(prettyJSON))
+		details.WriteString(fmt.Sprintf("ID: %s\n", data.ID))
+		details.WriteString(fmt.Sprintf("Title: %s\n", data.Title))
+		if data.Summary != "" {
+			details.WriteString(fmt.Sprintf("Summary: %s\n", data.Summary))
+		}
+		details.WriteString(fmt.Sprintf("Duration: %s | Views: %d | Likes: %d | Published: %t\n",
+			formatDuration(data.VideoDuration), data.PlayCount, data.LikeCount, data.Published))
+		if data.FileSize > 0 {
+			details.WriteString(fmt.Sprintf("Size: %s\n", formatFileSizeForViewer(data.FileSize)))
+		}
+
 	case db.Download:
-		// Download data
-		prettyJSON, _ := json.MarshalIndent(data, "", "  ")
-		fmt.Printf("%s\n", string(prettyJSON))
+		details.WriteString(fmt.Sprintf("ID: %s\n", data.ID))
+		details.WriteString(fmt.Sprintf("Title: %s\n", data.Title))
+		details.WriteString(fmt.Sprintf("File: %s\n", data.Filename))
+		details.WriteString(fmt.Sprintf("Status: %s | Size: %s | Torrent: %t\n",
+			data.Status, formatFileSizeForViewer(data.FileSize), data.TorrentCreated))
+		details.WriteString(fmt.Sprintf("Created: %s\n", data.CreatedAt.Format("2006-01-02 15:04:05")))
+
 	default:
-		fmt.Printf("Raw data: %+v\n", selectedData)
+		prettyJSON, err := json.MarshalIndent(selectedData, "", "  ")
+		if err == nil {
+			details.WriteString(string(prettyJSON))
+		} else {
+			details.WriteString(fmt.Sprintf("%+v", selectedData))
+		}
 	}
 
-	fmt.Printf(strings.Repeat("=", 80) + "\n")
+	return details.String()
 }
 
 func (m *databaseViewModel) loadBucket(bucketName string) {
@@ -412,7 +509,6 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 			if titleWidth < 25 {
 				titleWidth = 25
 			}
-
 			columns = []table.Column{
 				{Title: "ID", Width: idWidth},
 				{Title: "Title", Width: titleWidth},
@@ -532,19 +628,19 @@ func RunDatabaseViewer() error {
 	}
 
 	fmt.Printf("Starting interactive database viewer...\n")
-	fmt.Printf("💡 Mouse selection and text copying are enabled in your terminal.\n")
-	fmt.Printf("📋 Press Enter/Space on any row to print its full data to console.\n")
-	fmt.Printf("⌨️  Use ←/→ to switch buckets, ↑/↓ to navigate rows, 'q' to quit.\n\n")
+	fmt.Printf("Press Enter/Space on any row to view details, 'd' to toggle details panel.\n")
+	fmt.Printf("In details view: Press Enter/Ctrl+C to copy all, or use mouse selection.\n")
+	fmt.Printf("Use ←/→ to switch buckets, ↑/↓ to navigate rows, 'q' to quit.\n\n")
 
 	model := newDatabaseViewModel(database)
 
-	// Use alt screen and enable mouse support for better full-screen experience
-	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	// Simple program setup like your working example
+	p := tea.NewProgram(model)
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("failed to run database viewer: %w", err)
 	}
 
-	fmt.Printf("\n✅ Database viewer closed.\n")
+	fmt.Printf("\nDatabase viewer closed.\n")
 
 	return nil
 }
