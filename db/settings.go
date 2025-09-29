@@ -1,8 +1,9 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // GetSetting retrieves a setting value by key
@@ -13,12 +14,23 @@ func GetSetting(key string) (string, error) {
 	}
 
 	var value string
-	err = db.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&value)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return "", fmt.Errorf("setting '%s' not found", key)
+	err = db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(SettingsBucket)
+		if bucket == nil {
+			return fmt.Errorf("settings bucket not found")
 		}
-		return "", fmt.Errorf("failed to get setting '%s': %w", key, err)
+
+		data := bucket.Get([]byte(key))
+		if data == nil {
+			return fmt.Errorf("setting '%s' not found", key)
+		}
+
+		value = string(data)
+		return nil
+	})
+
+	if err != nil {
+		return "", err
 	}
 
 	return value, nil
@@ -31,10 +43,14 @@ func SetSetting(key, value string) error {
 		return err
 	}
 
-	_, err = db.Exec(`
-		INSERT OR REPLACE INTO settings (key, value, updated_at) 
-		VALUES (?, ?, CURRENT_TIMESTAMP)
-	`, key, value)
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(SettingsBucket)
+		if bucket == nil {
+			return fmt.Errorf("settings bucket not found")
+		}
+
+		return bucket.Put([]byte(key), []byte(value))
+	})
 
 	if err != nil {
 		return fmt.Errorf("failed to set setting '%s': %w", key, err)

@@ -44,14 +44,17 @@ This will:
 		client := NewClient("https://api.banned.video/graphql")
 
 		// Get count before fetching
-		db, err := GetDB()
+		_, err := GetDB()
 		if err != nil {
 			fmt.Printf("❌ Could not connect to database: %v\n", err)
 			return
 		}
 
-		var oldCount int
-		db.QueryRow("SELECT COUNT(*) FROM channels").Scan(&oldCount)
+		oldCount, err := CountChannels()
+		if err != nil {
+			fmt.Printf("⚠️ Could not get current channel count: %v\n", err)
+			oldCount = 0
+		}
 		fmt.Printf("📋 Current channels in database: %d\n", oldCount)
 
 		if err := client.FetchAllChannels(); err != nil {
@@ -63,9 +66,12 @@ This will:
 
 		// Show updated statistics
 		fmt.Println("\n📊 Updated database statistics:")
-		var newCount int
-		db.QueryRow("SELECT COUNT(*) FROM channels").Scan(&newCount)
-		fmt.Printf("📋 Channels in database: %d\n", newCount)
+		newCount, err := CountChannels()
+		if err != nil {
+			fmt.Printf("⚠️ Could not get updated channel count: %v\n", err)
+		} else {
+			fmt.Printf("📋 Channels in database: %d\n", newCount)
+		}
 
 		if newCount > oldCount {
 			fmt.Printf("🆕 Added %d new channels\n", newCount-oldCount)
@@ -137,18 +143,25 @@ Examples:
 
 		// Show updated statistics
 		fmt.Println("\n📊 Updated database statistics:")
-		db, err := GetDB()
+		_, err = GetDB()
 		if err != nil {
 			fmt.Printf("⚠️  Could not check database: %v\n", err)
 			return
 		}
 
-		var channelCount, videoCount int
-		db.QueryRow("SELECT COUNT(*) FROM channels").Scan(&channelCount)
-		db.QueryRow("SELECT COUNT(*) FROM videos").Scan(&videoCount)
+		channelCount, err := CountChannels()
+		if err != nil {
+			fmt.Printf("⚠️  Could not count channels: %v\n", err)
+		} else {
+			fmt.Printf("📋 Channels in database: %d\n", channelCount)
+		}
 
-		fmt.Printf("📋 Channels in database: %d\n", channelCount)
-		fmt.Printf("📋 Videos in database: %d\n", videoCount)
+		videoCount, err := CountVideos()
+		if err != nil {
+			fmt.Printf("⚠️  Could not count videos: %v\n", err)
+		} else {
+			fmt.Printf("📋 Videos in database: %d\n", videoCount)
+		}
 	},
 }
 
@@ -212,40 +225,23 @@ Examples:
 			channelID = args[0]
 		}
 
-		db, err := GetDB()
+		_, err := GetDB()
 		if err != nil {
 			fmt.Printf("❌ Could not connect to database: %v\n", err)
 			return
 		}
 
-		// Build query to find videos without file sizes
-		var query string
-		var queryArgs []interface{}
-
+		// Get videos without file sizes
 		if channelID != "" {
-			query = `SELECT id, direct_url FROM videos WHERE channel_id = ? AND (file_size = 0 OR file_size IS NULL) AND direct_url != ''`
-			queryArgs = []interface{}{channelID}
 			fmt.Printf("🔍 Finding videos without file sizes for channel %s...\n", channelID)
 		} else {
-			query = `SELECT id, direct_url FROM videos WHERE (file_size = 0 OR file_size IS NULL) AND direct_url != ''`
 			fmt.Printf("🔍 Finding all videos without file sizes...\n")
 		}
 
-		rows, err := db.Query(query, queryArgs...)
+		videos, err := GetVideosWithoutFileSize(channelID)
 		if err != nil {
-			fmt.Printf("❌ Failed to query videos: %v\n", err)
+			fmt.Printf("❌ Failed to get videos: %v\n", err)
 			return
-		}
-		defer rows.Close()
-
-		var videos []Video
-		for rows.Next() {
-			var video Video
-			if err := rows.Scan(&video.ID, &video.DirectURL); err != nil {
-				fmt.Printf("⚠️  Warning: failed to scan video: %v\n", err)
-				continue
-			}
-			videos = append(videos, video)
 		}
 
 		if len(videos) == 0 {
@@ -276,12 +272,12 @@ func fetchFunc(pkg string) tea.Cmd {
 	if err != nil {
 		return returnFunc
 	}
-	db, err := GetDB()
+	_, err = GetDB()
 	if err != nil {
 		time.Sleep(500 * time.Millisecond)
 		fetchFunc(pkg)
 	}
-	db.Exec("UPDATE videos SET file_size = ? WHERE direct_url = ?", size, pkg)
+	UpdateVideoFileSizeByURL(pkg, size)
 	return returnFunc
 }
 

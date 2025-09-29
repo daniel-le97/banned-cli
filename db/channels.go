@@ -1,8 +1,10 @@
 package db
 
 import (
-	"database/sql"
+	"encoding/json"
 	"fmt"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // StoreChannel stores a channel in the database
@@ -12,40 +14,26 @@ func StoreChannel(channel Channel) error {
 		return err
 	}
 
-	showTimes := ""
-	showPhone := ""
-	if channel.ShowInfo != nil {
-		showTimes = channel.ShowInfo.Times
-		showPhone = channel.ShowInfo.Phone
+	// Serialize channel to JSON
+	data, err := json.Marshal(channel)
+	if err != nil {
+		return fmt.Errorf("failed to marshal channel '%s': %w", channel.ID, err)
 	}
 
-	website, facebook, twitter, gab, minds, telegram, subscribeStar := "", "", "", "", "", "", ""
-	if channel.Links != nil {
-		website = channel.Links.Website
-		facebook = channel.Links.Facebook
-		twitter = channel.Links.Twitter
-		gab = channel.Links.Gab
-		minds = channel.Links.Minds
-		telegram = channel.Links.Telegram
-		subscribeStar = channel.Links.SubscribeStar
-	}
+	// Store in bbolt
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(ChannelsBucket)
+		if bucket == nil {
+			return fmt.Errorf("channels bucket not found")
+		}
 
-	_, err = db.Exec(`
-		INSERT OR REPLACE INTO channels (
-			id, title, summary, text_info, avatar, cover_image, is_live,
-			total_videos, total_video_views, total_likes,
-			show_times, show_phone, website, facebook, twitter, gab, minds,
-			telegram, subscribe_star, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, channel.ID, channel.Title, channel.Summary, channel.TextInfo, channel.Avatar,
-		channel.CoverImage, channel.IsLive, int(channel.TotalVideos), 0, 0,
-		showTimes, showPhone, website, facebook, twitter, gab, minds, telegram, subscribeStar)
+		return bucket.Put([]byte(channel.ID), data)
+	})
 
 	if err != nil {
 		return fmt.Errorf("failed to store channel '%s': %w", channel.ID, err)
 	}
 
-	LogDebug("Stored channel: %s (%s)", channel.ID, channel.Title)
 	return nil
 }
 
@@ -56,69 +44,107 @@ func GetAllChannels() ([]Channel, error) {
 		return nil, err
 	}
 
-	query := `
-		SELECT id, title, summary, text_info, avatar, cover_image, is_live,
-			   COALESCE(total_videos, 0), COALESCE(total_video_views, 0), COALESCE(total_likes, 0),
-			   show_times, show_phone, website, facebook, twitter, gab, minds,
-			   telegram, subscribe_star
-		FROM channels 
-		ORDER BY title
-	`
-
-	rows, err := db.Query(query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query channels: %w", err)
-	}
-	defer rows.Close()
-
 	var channels []Channel
-	for rows.Next() {
-		var channel Channel
-		var totalVideos, totalVideoViews, totalLikes int
-		var showTimes, showPhone, website, facebook, twitter, gab, minds, telegram, subscribeStar sql.NullString
 
-		err := rows.Scan(
-			&channel.ID, &channel.Title, &channel.Summary, &channel.TextInfo,
-			&channel.Avatar, &channel.CoverImage, &channel.IsLive,
-			&totalVideos, &totalVideoViews, &totalLikes,
-			&showTimes, &showPhone, &website, &facebook, &twitter, &gab, &minds,
-			&telegram, &subscribeStar,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan channel: %w", err)
+	err = db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(ChannelsBucket)
+		if bucket == nil {
+			return fmt.Errorf("channels bucket not found")
 		}
 
-		// Assign the video counts
-		channel.TotalVideos = float64(totalVideos)
-		channel.TotalVideoViews = float64(totalVideoViews)
-		channel.TotalLikes = float64(totalLikes)
-
-		// Populate nested structs if data exists
-		if showTimes.Valid || showPhone.Valid {
-			channel.ShowInfo = &ShowInfo{
-				Times: showTimes.String,
-				Phone: showPhone.String,
+		return bucket.ForEach(func(k, v []byte) error {
+			var channel Channel
+			if err := json.Unmarshal(v, &channel); err != nil {
+				return fmt.Errorf("failed to unmarshal channel %s: %w", string(k), err)
 			}
-		}
+			channels = append(channels, channel)
+			return nil
+		})
+	})
 
-		if website.Valid || facebook.Valid || twitter.Valid || gab.Valid || minds.Valid || telegram.Valid || subscribeStar.Valid {
-			channel.Links = &Links{
-				Website:       website.String,
-				Facebook:      facebook.String,
-				Twitter:       twitter.String,
-				Gab:           gab.String,
-				Minds:         minds.String,
-				Telegram:      telegram.String,
-				SubscribeStar: subscribeStar.String,
-			}
-		}
-
-		channels = append(channels, channel)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("error reading channel rows: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all channels: %w", err)
 	}
 
 	return channels, nil
+}
+
+// GetChannel retrieves a single channel by ID
+func GetChannel(channelID string) (*Channel, error) {
+	db, err := GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	var channel Channel
+
+	err = db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(ChannelsBucket)
+		if bucket == nil {
+			return fmt.Errorf("channels bucket not found")
+		}
+
+		data := bucket.Get([]byte(channelID))
+		if data == nil {
+			return fmt.Errorf("channel '%s' not found", channelID)
+		}
+
+		return json.Unmarshal(data, &channel)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &channel, nil
+}
+
+// DeleteChannel removes a channel from the database
+func DeleteChannel(channelID string) error {
+	db, err := GetDB()
+	if err != nil {
+		return err
+	}
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(ChannelsBucket)
+		if bucket == nil {
+			return fmt.Errorf("channels bucket not found")
+		}
+
+		return bucket.Delete([]byte(channelID))
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to delete channel '%s': %w", channelID, err)
+	}
+
+	return nil
+}
+
+// ChannelExists checks if a channel exists in the database
+func ChannelExists(channelID string) (bool, error) {
+	db, err := GetDB()
+	if err != nil {
+		return false, err
+	}
+
+	var exists bool
+
+	err = db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(ChannelsBucket)
+		if bucket == nil {
+			return fmt.Errorf("channels bucket not found")
+		}
+
+		data := bucket.Get([]byte(channelID))
+		exists = data != nil
+		return nil
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
 }

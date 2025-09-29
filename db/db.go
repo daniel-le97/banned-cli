@@ -1,20 +1,19 @@
 package db
 
 import (
-	"database/sql"
+	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
-	_ "modernc.org/sqlite"
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
-	// Global database instance
-	DB *sql.DB
+	// Global bbolt database instance
+	DB *bolt.DB
 
 	// Ensure database is initialized only once
 	dbOnce sync.Once
@@ -23,8 +22,16 @@ var (
 	dbInitError error
 )
 
+// Bucket names for different data types
+var (
+	ChannelsBucket  = []byte("channels")
+	VideosBucket    = []byte("videos")
+	DownloadsBucket = []byte("downloads")
+	SettingsBucket  = []byte("settings")
+)
+
 // GetDB returns the global database instance, initializing it if necessary
-func GetDB() (*sql.DB, error) {
+func GetDB() (*bolt.DB, error) {
 	dbOnce.Do(func() {
 		var err error
 		DB, err = initDatabase()
@@ -33,9 +40,15 @@ func GetDB() (*sql.DB, error) {
 			return
 		}
 
-		// Create tables if they don't exist
-		if err := createTables(); err != nil {
-			dbInitError = fmt.Errorf("failed to create tables: %w", err)
+		// Create buckets if they don't exist
+		if err := createBuckets(); err != nil {
+			dbInitError = fmt.Errorf("failed to create buckets: %w", err)
+			return
+		}
+
+		// Insert default settings
+		if err := insertDefaultSettings(); err != nil {
+			dbInitError = fmt.Errorf("failed to insert default settings: %w", err)
 			return
 		}
 	})
@@ -47,141 +60,81 @@ func GetDB() (*sql.DB, error) {
 	return DB, nil
 }
 
-// initDatabase initializes the SQLite database connection
-func initDatabase() (*sql.DB, error) {
-	// Get the database path
+// initDatabase initializes the bbolt database connection
+func initDatabase() (*bolt.DB, error) {
 	dbPath, err := getDatabasePath()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get database path: %w", err)
 	}
 
-	// Create the directory if it doesn't exist
-	dbDir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
+	// Ensure the directory exists
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
-	// Check if database exists, if not try to copy bundled database
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		if err := copyBundledDatabase(dbPath); err != nil {
-			// If copying bundled database fails, continue with creating empty database
-			fmt.Printf("📦 Could not copy bundled database (%v), creating empty database...\n", err)
-		} else {
-			fmt.Printf("📦 Initialized with bundled database containing sample data!\n")
-		}
-	}
-
-	// Open database connection
-	dsn := fmt.Sprintf("file:%s?cache=shared&mode=rwc&_journal_mode=WAL&_foreign_keys=on", dbPath)
-	db, err := sql.Open("sqlite", dsn)
+	// Open bbolt database
+	db, err := bolt.Open(dbPath, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Test the connection
-	if err := db.Ping(); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-
-	// Configure connection pool
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(10)
-
 	return db, nil
+}
+
+// createBuckets creates all necessary buckets
+func createBuckets() error {
+	return DB.Update(func(tx *bolt.Tx) error {
+		buckets := [][]byte{
+			ChannelsBucket,
+			VideosBucket,
+			DownloadsBucket,
+			SettingsBucket,
+		}
+
+		for _, bucket := range buckets {
+			if _, err := tx.CreateBucketIfNotExists(bucket); err != nil {
+				return fmt.Errorf("failed to create bucket %s: %w", string(bucket), err)
+			}
+		}
+
+		return nil
+	})
 }
 
 // getDatabasePath returns the path where the database should be stored
 func getDatabasePath() (string, error) {
-	// For development: use current directory if DEV environment variable is set
-	// or if we can detect we're in development mode
-	if os.Getenv("DEV") != "" || os.Getenv("DEVELOPMENT") != "" || isDevelopmentMode() {
-		// Use current directory for development
-		currentDir, err := os.Getwd()
-		if err != nil {
-			return "", fmt.Errorf("failed to get current directory: %w", err)
-		}
-		return filepath.Join(currentDir, "banned.db"), nil
+	// Try to get user config directory first
+	userConfigDir, err := os.UserConfigDir()
+	if err == nil {
+		dbPath := filepath.Join(userConfigDir, "banned", "banned.db")
+		return dbPath, nil
 	}
 
-	// Get user's data directory
-	userDataDir, err := os.UserConfigDir()
-	if err != nil {
-		// Fallback to home directory
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("failed to get user directories: %w", err)
-		}
-		userDataDir = homeDir
+	// Fallback to user data directory
+	userDataDir, err := getUserDataDir()
+	if err == nil {
+		dbPath := filepath.Join(userDataDir, "banned", "banned.db")
+		return dbPath, nil
 	}
 
-	// Create the application data directory
-	appDataDir := filepath.Join(userDataDir, "banned")
-	return filepath.Join(appDataDir, "banned.db"), nil
+	// Final fallback to current directory
+	return "banned.db", nil
 }
 
-// isDevelopmentMode detects if we're running in development mode
-func isDevelopmentMode() bool {
-	// Check if we're in a git repository (common development indicator)
-	if _, err := os.Stat(".git"); err == nil {
-		return true
-	}
-
-	// Check if main.go exists in current directory
-	if _, err := os.Stat("main.go"); err == nil {
-		return true
-	}
-
-	// Check if go.mod exists in current directory
-	if _, err := os.Stat("go.mod"); err == nil {
-		return true
-	}
-
-	return false
-}
-
-// copyBundledDatabase attempts to copy a bundled database to the target path
-func copyBundledDatabase(dbPath string) error {
-	// Look for bundled database in several locations
-	possibleSources := []string{
-		"banned.db",                   // Current directory
-		"data/banned.db",              // Data directory
-		"assets/banned.db",            // Assets directory
-		"/usr/share/banned/banned.db", // System installation
-	}
-
-	for _, src := range possibleSources {
-		if _, err := os.Stat(src); err == nil {
-			// Source exists, try to copy it
-			if err := copyFile(src, dbPath); err == nil {
-				return nil // Success
-			}
-		}
-	}
-
-	return fmt.Errorf("no bundled database found in any of the expected locations")
-}
-
-// copyFile copies a file from src to dst
-func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
+// getUserDataDir returns the user data directory
+func getUserDataDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return err
-	}
-	defer sourceFile.Close()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destFile.Close()
-
-	_, err = io.Copy(destFile, sourceFile)
-	if err != nil {
-		return err
+		return "", err
 	}
 
-	return destFile.Sync()
+	// Use appropriate data directory for the OS
+	switch {
+	case os.Getenv("XDG_DATA_HOME") != "":
+		return os.Getenv("XDG_DATA_HOME"), nil
+	default:
+		return filepath.Join(homeDir, ".local", "share"), nil
+	}
 }
 
 // CloseDB closes the database connection
@@ -192,14 +145,157 @@ func CloseDB() error {
 	return nil
 }
 
-// GetDatabasePath returns the path where the database is stored
+// GetBucketStats returns statistics for all buckets
+func GetBucketStats() (map[string]int, error) {
+	db, err := GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	stats := make(map[string]int)
+
+	err = db.View(func(tx *bolt.Tx) error {
+		buckets := map[string][]byte{
+			"channels":  ChannelsBucket,
+			"videos":    VideosBucket,
+			"downloads": DownloadsBucket,
+			"settings":  SettingsBucket,
+		}
+
+		for name, bucketName := range buckets {
+			bucket := tx.Bucket(bucketName)
+			if bucket == nil {
+				stats[name] = 0
+				continue
+			}
+
+			count := 0
+			bucket.ForEach(func(k, v []byte) error {
+				count++
+				return nil
+			})
+			stats[name] = count
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bucket stats: %w", err)
+	}
+
+	return stats, nil
+}
+
+// CountChannels returns the number of channels in the database
+func CountChannels() (int, error) {
+	db, err := GetDB()
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	err = db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(ChannelsBucket)
+		if bucket == nil {
+			return nil
+		}
+
+		bucket.ForEach(func(k, v []byte) error {
+			count++
+			return nil
+		})
+		return nil
+	})
+
+	return count, err
+}
+
+// CountVideos returns the number of videos in the database
+func CountVideos() (int, error) {
+	db, err := GetDB()
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	err = db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(VideosBucket)
+		if bucket == nil {
+			return nil
+		}
+
+		bucket.ForEach(func(k, v []byte) error {
+			count++
+			return nil
+		})
+		return nil
+	})
+
+	return count, err
+}
+
+// CountVideosForChannel returns the number of videos for a specific channel
+func CountVideosForChannel(channelID string) (int, error) {
+	db, err := GetDB()
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	err = db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(VideosBucket)
+		if bucket == nil {
+			return nil
+		}
+
+		return bucket.ForEach(func(k, v []byte) error {
+			var record VideoRecord
+			if err := json.Unmarshal(v, &record); err != nil {
+				return nil // Skip invalid records
+			}
+
+			if record.ChannelID == channelID {
+				count++
+			}
+			return nil
+		})
+	})
+
+	return count, err
+}
+
+// GetDatabasePath returns the current database path (for compatibility)
 func GetDatabasePath() (string, error) {
 	return getDatabasePath()
 }
 
-// LogDebug prints debug messages when in development mode
-func LogDebug(message string, args ...interface{}) {
-	if isDevelopmentMode() {
-		log.Printf("[DEBUG] "+message, args...)
-	}
+// insertDefaultSettings inserts default application settings
+func insertDefaultSettings() error {
+	return DB.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(SettingsBucket)
+		if bucket == nil {
+			return fmt.Errorf("settings bucket not found")
+		}
+
+		// Default settings to insert
+		defaultSettings := map[string]string{
+			"download_directory": "~/Downloads/banned/",
+			"last_sync":          "2023-01-01T00:00:00Z",
+			"api_endpoint":       "https://api.banned.video/graphql",
+			"user_agent":         "banned-cli/1.0",
+		}
+
+		// Insert settings only if they don't exist
+		for key, value := range defaultSettings {
+			existing := bucket.Get([]byte(key))
+			if existing == nil {
+				if err := bucket.Put([]byte(key), []byte(value)); err != nil {
+					return fmt.Errorf("failed to insert default setting %s: %w", key, err)
+				}
+			}
+		}
+
+		return nil
+	})
 }

@@ -6,7 +6,6 @@ package cmd
 import (
 	"fmt"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +34,7 @@ var dbStatusCmd = &cobra.Command{
 		fmt.Printf("📍 Location: %s\n", dbPath)
 
 		// Try to connect
-		db, err := GetDB()
+		_, err := GetDB()
 		if err != nil {
 			fmt.Printf("❌ Status: Failed (%v)\n", err)
 			return
@@ -43,17 +42,18 @@ var dbStatusCmd = &cobra.Command{
 
 		fmt.Printf("✅ Status: Connected\n\n")
 
-		// Show table statistics
-		tables := []string{"channels", "videos", "downloads", "settings"}
-		fmt.Println("📋 Table Statistics:")
-		for _, table := range tables {
-			var count int
-			err := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM %s", table)).Scan(&count)
-			if err != nil {
-				fmt.Printf("   %s: Error (%v)\n", table, err)
-			} else {
-				fmt.Printf("   %s: %d records\n", table, count)
-			}
+		// Show bucket statistics
+		stats, err := GetBucketStats()
+		if err != nil {
+			fmt.Printf("❌ Failed to get bucket statistics: %v\n", err)
+			return
+		}
+
+		fmt.Println("📋 Bucket Statistics:")
+		buckets := []string{"channels", "videos", "downloads", "settings"}
+		for _, bucket := range buckets {
+			count := stats[bucket]
+			fmt.Printf("   %s: %d records\n", bucket, count)
 		}
 
 		fmt.Println("\n💡 Use 'banned config list' to view application settings")
@@ -66,30 +66,12 @@ var dbViewCmd = &cobra.Command{
 	Short: "Interactive database table viewer",
 	Long: `View database tables and records in an interactive Bubble Tea interface.
 
-Navigation:
-  ←/→ or Tab - Switch between tables
-  ↑/↓        - Navigate rows  
-  q          - Quit
-
-Tables available: Downloads, Settings, Channels, Videos`,
+Note: Database viewer is temporarily disabled during bbolt migration.
+Use 'db status' to view bucket statistics instead.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("🔗 Connecting to database...")
-		db, err := GetDB()
-		if err != nil {
-			fmt.Printf("❌ Failed to connect to database: %v\n", err)
-			return
-		}
-
-		fmt.Println("📊 Starting database viewer...")
-		fmt.Println("💡 Use ←/→ or Tab to switch tables, ↑/↓ to navigate, 'q' to quit")
-
-		model := newDatabaseViewModel(db)
-		p := tea.NewProgram(model, tea.WithAltScreen())
-		if _, err := p.Run(); err != nil {
-			fmt.Printf("❌ Error running database viewer: %v\n", err)
-		}
-
-		fmt.Println("👋 Database viewer closed")
+		fmt.Println("� Database viewer is temporarily disabled during bbolt migration")
+		fmt.Println("📊 Use 'banned db status' to view bucket statistics")
+		fmt.Println("💡 Use 'banned config list' to view application settings")
 	},
 }
 

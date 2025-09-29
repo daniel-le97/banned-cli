@@ -2,15 +2,14 @@ package cmd
 
 // Import the db package to make database functions available
 import (
-	"database/sql"
-
 	"github.com/daniel-le97/banned-cli/db"
+	bolt "go.etcd.io/bbolt"
 )
 
 // Database function aliases for backward compatibility
 // These functions call the db package directly
 
-func GetDB() (*sql.DB, error) {
+func GetDB() (*bolt.DB, error) {
 	return db.GetDB()
 }
 
@@ -129,6 +128,56 @@ func SetSetting(key, value string) error {
 
 func getDatabasePath() (string, error) {
 	return db.GetDatabasePath()
+}
+
+func GetBucketStats() (map[string]int, error) {
+	return db.GetBucketStats()
+}
+
+func CountChannels() (int, error) {
+	return db.CountChannels()
+}
+
+func CountVideos() (int, error) {
+	return db.CountVideos()
+}
+
+func CountVideosForChannel(channelID string) (int, error) {
+	return db.CountVideosForChannel(channelID)
+}
+
+func GetVideosWithoutFileSize(channelID string) ([]Video, error) {
+	dbVideos, err := db.GetVideosWithoutFileSize(channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert db.Video to cmd.Video
+	var videos []Video
+	for _, dbVideo := range dbVideos {
+		video := Video{
+			ID:            dbVideo.ID,
+			Title:         dbVideo.Title,
+			Summary:       dbVideo.Summary,
+			LargeImage:    dbVideo.LargeImage,
+			VideoDuration: dbVideo.VideoDuration,
+			CreatedAt:     dbVideo.CreatedAt,
+			DirectURL:     dbVideo.DirectURL,
+			PlayCount:     dbVideo.PlayCount,
+			LikeCount:     dbVideo.LikeCount,
+			AngerCount:    dbVideo.AngerCount,
+			EmbedURL:      dbVideo.EmbedURL,
+			Published:     dbVideo.Published,
+			FileSize:      dbVideo.FileSize,
+		}
+		videos = append(videos, video)
+	}
+
+	return videos, nil
+}
+
+func UpdateVideoFileSizeByURL(directURL string, fileSize int64) error {
+	return db.UpdateVideoFileSizeByURL(directURL, fileSize)
 }
 
 // Conversion helper functions
