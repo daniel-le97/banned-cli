@@ -131,12 +131,14 @@ func (m *databaseViewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		tableHeight := m.height - 6 // Account for title, headers, and status bar
+		// Use more of the terminal space - account for title (1) + status bar (1) + margins (1)
+		tableHeight := m.height - 3
 		if tableHeight < 5 {
 			tableHeight = 5
 		}
 
-		m.table.SetWidth(m.width - 4)
+		// Use nearly full width, just leave small margins
+		m.table.SetWidth(m.width - 2)
 		m.table.SetHeight(tableHeight)
 		return m, nil
 
@@ -183,14 +185,14 @@ func (m *databaseViewModel) View() string {
 		return fmt.Sprintf("📵 Bucket '%s' is empty\n\nPress ←/→ to switch buckets or 'q' to quit.", dbBuckets[m.currentBucket])
 	}
 
-	// Title bar
+	// Title bar - use full width
 	titleText := fmt.Sprintf(" 📊 Database Viewer - %s (%d records) ", dbBuckets[m.currentBucket], recordCount)
 	titleBar := titleBarStyle.Width(m.width).Render(titleText)
 
-	// Table view
-	tableView := baseStyle.Width(m.width - 2).Height(m.height - 4).Render(m.table.View())
+	// Table view - use full available space
+	tableView := m.table.View()
 
-	// Status bar with navigation help
+	// Status bar with navigation help - use full width
 	statusText := fmt.Sprintf(" ←/→: Switch buckets | ↑/↓: Navigate rows | q: Quit | Current: %s ", m.currentBucket)
 	statusBar := statusBarStyle.Width(m.width).Render(statusText)
 
@@ -209,9 +211,19 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 
 		switch bucketName {
 		case "settings":
+			// Calculate responsive column widths based on terminal width
+			keyWidth := m.width / 3
+			valueWidth := m.width - keyWidth - 4 // Leave some padding
+			if keyWidth < 15 {
+				keyWidth = 15
+			}
+			if valueWidth < 25 {
+				valueWidth = 25
+			}
+
 			columns = []table.Column{
-				{Title: "Key", Width: 30},
-				{Title: "Value", Width: 50},
+				{Title: "Key", Width: keyWidth},
+				{Title: "Value", Width: valueWidth},
 			}
 
 			bucket.ForEach(func(k, v []byte) error {
@@ -223,12 +235,26 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 			})
 
 		case "channels":
+			// Calculate responsive column widths
+			idWidth := m.width / 5
+			titleWidth := m.width / 2
+			videosWidth := 10
+			viewsWidth := 12
+			liveWidth := 8
+
+			if idWidth < 20 {
+				idWidth = 20
+			}
+			if titleWidth < 30 {
+				titleWidth = 30
+			}
+
 			columns = []table.Column{
-				{Title: "ID", Width: 25},
-				{Title: "Title", Width: 40},
-				{Title: "Videos", Width: 10},
-				{Title: "Views", Width: 15},
-				{Title: "Live", Width: 8},
+				{Title: "ID", Width: idWidth},
+				{Title: "Title", Width: titleWidth},
+				{Title: "Videos", Width: videosWidth},
+				{Title: "Views", Width: viewsWidth},
+				{Title: "Live", Width: liveWidth},
 			}
 
 			bucket.ForEach(func(k, v []byte) error {
@@ -243,8 +269,8 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 				}
 
 				rows = append(rows, table.Row{
-					truncateString(channel.ID, 23),
-					truncateString(channel.Title, 38),
+					truncateString(channel.ID, idWidth-2),
+					truncateString(channel.Title, titleWidth-2),
 					fmt.Sprintf("%.0f", channel.TotalVideos),
 					fmt.Sprintf("%.0f", channel.TotalVideoViews),
 					liveStatus,
@@ -253,13 +279,28 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 			})
 
 		case "videos":
+			// Calculate responsive column widths
+			idWidth := m.width / 6
+			titleWidth := m.width / 2
+			durationWidth := 12
+			viewsWidth := 10
+			likesWidth := 8
+			sizeWidth := 12
+
+			if idWidth < 20 {
+				idWidth = 20
+			}
+			if titleWidth < 25 {
+				titleWidth = 25
+			}
+
 			columns = []table.Column{
-				{Title: "ID", Width: 25},
-				{Title: "Title", Width: 35},
-				{Title: "Duration", Width: 12},
-				{Title: "Views", Width: 10},
-				{Title: "Likes", Width: 8},
-				{Title: "Size", Width: 12},
+				{Title: "ID", Width: idWidth},
+				{Title: "Title", Width: titleWidth},
+				{Title: "Duration", Width: durationWidth},
+				{Title: "Views", Width: viewsWidth},
+				{Title: "Likes", Width: likesWidth},
+				{Title: "Size", Width: sizeWidth},
 			}
 
 			bucket.ForEach(func(k, v []byte) error {
@@ -275,8 +316,8 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 				fileSize := formatFileSizeForViewer(record.Video.FileSize)
 
 				rows = append(rows, table.Row{
-					truncateString(record.Video.ID, 23),
-					truncateString(record.Video.Title, 33),
+					truncateString(record.Video.ID, idWidth-2),
+					truncateString(record.Video.Title, titleWidth-2),
 					duration,
 					fmt.Sprintf("%d", record.Video.PlayCount),
 					fmt.Sprintf("%d", record.Video.LikeCount),
@@ -286,13 +327,28 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 			})
 
 		case "downloads":
+			// Calculate responsive column widths
+			idWidth := m.width / 6
+			titleWidth := m.width / 3
+			statusWidth := 12
+			sizeWidth := 12
+			torrentWidth := 10
+			createdWidth := 15
+
+			if idWidth < 20 {
+				idWidth = 20
+			}
+			if titleWidth < 25 {
+				titleWidth = 25
+			}
+
 			columns = []table.Column{
-				{Title: "ID", Width: 25},
-				{Title: "Title", Width: 30},
-				{Title: "Status", Width: 12},
-				{Title: "Size", Width: 12},
-				{Title: "Torrent", Width: 10},
-				{Title: "Created", Width: 15},
+				{Title: "ID", Width: idWidth},
+				{Title: "Title", Width: titleWidth},
+				{Title: "Status", Width: statusWidth},
+				{Title: "Size", Width: sizeWidth},
+				{Title: "Torrent", Width: torrentWidth},
+				{Title: "Created", Width: createdWidth},
 			}
 
 			bucket.ForEach(func(k, v []byte) error {
@@ -310,8 +366,8 @@ func (m *databaseViewModel) loadBucket(bucketName string) {
 				fileSize := formatFileSizeForViewer(download.FileSize)
 
 				rows = append(rows, table.Row{
-					truncateString(download.ID, 23),
-					truncateString(download.Title, 28),
+					truncateString(download.ID, idWidth-2),
+					truncateString(download.Title, titleWidth-2),
 					download.Status,
 					fileSize,
 					torrentStatus,
@@ -403,7 +459,8 @@ func RunDatabaseViewer() error {
 
 	model := newDatabaseViewModel(database)
 
-	p := tea.NewProgram(model, tea.WithAltScreen())
+	// Use alt screen and enable mouse support for better full-screen experience
+	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("failed to run database viewer: %w", err)
 	}
