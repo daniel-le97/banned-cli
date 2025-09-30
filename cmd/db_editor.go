@@ -1,13 +1,14 @@
 package cmd
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -17,6 +18,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//go:embed web/*
+var webFS embed.FS
+
 // dbEditorCmd represents the db editor command
 var dbEditorCmd = &cobra.Command{
 	Use:   "editor",
@@ -25,10 +29,9 @@ var dbEditorCmd = &cobra.Command{
 
 This command starts a local web server with an embedded SQLite editor interface
 that allows you to:
-- Browse database tables and data
-- Execute SQL queries with real-time results
-- View table schemas and relationships
-- Export query results
+- Browse database tables and data with real-time search
+- View table schemas and field information
+- Explore database statistics and relationships
 
 The web interface will be available at http://localhost:8080`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -63,19 +66,27 @@ func init() {
 }
 
 func startWebEditor(port int) error {
-	// Get current working directory to find web files
-	webDir := "./web"
+	// Create a sub-filesystem for the web directory from embedded files
+	webSubFS, err := fs.Sub(webFS, "web")
+	if err != nil {
+		return fmt.Errorf("failed to create web sub-filesystem: %w", err)
+	}
 
-	// Serve static files from web directory
-	http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir(webDir))))
+	// Serve static files from embedded filesystem
+	http.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.FS(webSubFS))))
 
 	// Serve main page
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, filepath.Join(webDir, "index.html"))
+		indexHTML, err := webFS.ReadFile("web/index.html")
+		if err != nil {
+			http.Error(w, "Failed to read index.html: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		w.Write(indexHTML)
 	})
 
 	// API endpoints for database operations
-	http.HandleFunc("/api/query", handleSQLQuery)
 	http.HandleFunc("/api/tables", handleListTables)
 	http.HandleFunc("/api/schema", handleGetSchema)
 	http.HandleFunc("/api/data", handleGetTableData)
@@ -489,129 +500,6 @@ func handleGetTableData(w http.ResponseWriter, r *http.Request) {
 		"columns":   columns,
 		"isEmpty":   false,
 	})
-}
-
-func handleSQLQuery(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		Query string `json:"query"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	query := strings.TrimSpace(req.Query)
-	if query == "" {
-		http.Error(w, "Query cannot be empty", http.StatusBadRequest)
-		return
-	}
-
-	database, err := db.GetDB()
-	if err != nil {
-		response := map[string]interface{}{
-			"success": false,
-			"error":   "Database connection failed: " + err.Error(),
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
-		return
-	}
-
-	// Determine if this is a SELECT query or a modification query
-	queryType := strings.ToUpper(strings.Fields(query)[0])
-
-	var results []map[string]interface{}
-	var message string
-	var rowsAffected int64
-
-	if queryType == "SELECT" || queryType == "PRAGMA" || queryType == "EXPLAIN" {
-		// Execute SELECT query
-		rows, err := database.Query(query)
-		if err != nil {
-			response := map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-				"query":   query,
-			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-		defer rows.Close()
-
-		// Get column names
-		columns, err := rows.Columns()
-		if err != nil {
-			response := map[string]interface{}{
-				"success": false,
-				"error":   "Failed to get columns: " + err.Error(),
-			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-
-		for rows.Next() {
-			// Create a slice to hold column values
-			values := make([]interface{}, len(columns))
-			valuePtrs := make([]interface{}, len(columns))
-			for i := range values {
-				valuePtrs[i] = &values[i]
-			}
-
-			// Scan values
-			if err := rows.Scan(valuePtrs...); err != nil {
-				continue
-			}
-
-			// Create row map
-			row := make(map[string]interface{})
-			for i, column := range columns {
-				val := values[i]
-				// Convert byte arrays to strings for JSON serialization
-				if b, ok := val.([]byte); ok {
-					val = string(b)
-				}
-				row[column] = val
-			}
-			results = append(results, row)
-		}
-
-		message = fmt.Sprintf("Query executed successfully. Returned %d rows.", len(results))
-	} else {
-		// Execute modification query (INSERT, UPDATE, DELETE, etc.)
-		result, err := database.Exec(query)
-		if err != nil {
-			response := map[string]interface{}{
-				"success": false,
-				"error":   err.Error(),
-				"query":   query,
-			}
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
-			return
-		}
-
-		rowsAffected, _ = result.RowsAffected()
-		message = fmt.Sprintf("Query executed successfully. %d rows affected.", rowsAffected)
-	}
-
-	response := map[string]interface{}{
-		"success":      true,
-		"message":      message,
-		"query":        query,
-		"results":      results,
-		"rowsAffected": rowsAffected,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }
 
 func handleGetStats(w http.ResponseWriter, r *http.Request) {
