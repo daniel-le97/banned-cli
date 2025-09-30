@@ -142,32 +142,9 @@ function TablesList ( { tables, selectedTable, onTableSelect, tableCounts } )
     `;
 }
 
-function QuickActions ( { onQuery } )
-{
-    const quickQueries = [
-        'SELECT name FROM sqlite_master WHERE type="table"',
-        'PRAGMA table_info(channels)',
-        'SELECT COUNT(*) FROM channels',
-        'SELECT COUNT(*) FROM videos',
-        'SELECT * FROM settings'
-    ];
 
-    return html`
-        <div className="quick-actions">
-            <h4>Quick Queries</h4>
-            ${ quickQueries.map( ( query, index ) => html`
-                <button
-                    key=${ index }
-                    onClick=${ () => onQuery( query ) }
-                >
-                    ${ query.substring( 0, 25 ) + '...' }
-                </button>
-            `) }
-        </div>
-    `;
-}
 
-function Sidebar ( { tables, selectedTable, onTableSelect, stats, statsLoading, tableCounts, onQuickQuery, collapsed, onToggle } )
+function Sidebar ( { tables, selectedTable, onTableSelect, stats, statsLoading, tableCounts, collapsed, onToggle } )
 {
     return html`
         <aside className=${ `sidebar ${ collapsed ? 'collapsed' : '' }` }>
@@ -181,7 +158,6 @@ function Sidebar ( { tables, selectedTable, onTableSelect, stats, statsLoading, 
             <div className="sidebar-content">
                 <${ StatsSection } stats=${ stats } loading=${ statsLoading } />
                 <${ TablesList } tables=${ tables } selectedTable=${ selectedTable } onTableSelect=${ onTableSelect } tableCounts=${ tableCounts } />
-                <${ QuickActions } onQuery=${ onQuickQuery } />
             </div>
         </aside>
     `;
@@ -502,35 +478,87 @@ function SchemaViewer ( { selectedTable, schema, loading, error } )
     }
 
     return html`
-        <div>
-            <h3>Schema: ${ selectedTable }</h3>
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Column</th>
-                        <th>Type</th>
-                        <th>Not Null</th>
-                        <th>Default</th>
-                        <th>Primary Key</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${ schema.map( ( col, index ) => html`
-                        <tr key=${ index }>
-                            <td>${ col.name }</td>
-                            <td>${ col.type }</td>
-                            <td>${ col.notnull ? 'Yes' : 'No' }</td>
-                            <td>${ col.dflt_value || '' }</td>
-                            <td>${ col.pk ? 'Yes' : 'No' }</td>
-                        </tr>
-                    `) }
-                </tbody>
-            </table>
+        <div className="schema-container">
+            <div className="schema-header">
+                <h3>Table Schema: ${ selectedTable }</h3>
+                <p className="schema-description">Fields and data types for records in this table</p>
+            </div>
+            
+            <div className="schema-content">
+                <div className="schema-table-wrapper">
+                    <table className="schema-table">
+                        <thead>
+                            <tr>
+                                <th className="col-name">Field Name</th>
+                                <th className="col-type">Data Type</th>
+                                <th className="col-constraints">Constraints</th>
+                                <th className="col-default">Default Value</th>
+                                <th className="col-description">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${ schema.map( ( col, index ) =>
+    {
+        const constraints = [];
+        if ( col.primary ) constraints.push( 'PRIMARY KEY' );
+        if ( col.notNull ) constraints.push( 'NOT NULL' );
+
+        // Generate field descriptions based on common patterns
+        const getFieldDescription = ( name, type ) =>
+        {
+            const lowerName = name.toLowerCase();
+            if ( lowerName.includes( 'id' ) && col.primary ) return 'Unique identifier for this record';
+            if ( lowerName === 'name' ) return 'Display name or title';
+            if ( lowerName === 'title' ) return 'Title or heading text';
+            if ( lowerName === 'description' ) return 'Detailed description or content';
+            if ( lowerName === 'url' ) return 'Web address or link';
+            if ( lowerName.includes( 'created' ) ) return 'Record creation timestamp';
+            if ( lowerName.includes( 'updated' ) ) return 'Last modification timestamp';
+            if ( lowerName.includes( 'date' ) || lowerName.includes( 'time' ) ) return 'Date/time information';
+            if ( lowerName.includes( 'count' ) || lowerName.includes( 'num' ) ) return 'Numeric count or quantity';
+            if ( type.toLowerCase().includes( 'text' ) ) return 'Text content';
+            if ( type.toLowerCase().includes( 'int' ) ) return 'Integer number';
+            if ( type.toLowerCase().includes( 'real' ) || type.toLowerCase().includes( 'float' ) ) return 'Decimal number';
+            if ( type.toLowerCase().includes( 'blob' ) ) return 'Binary data';
+            return 'Data field';
+        };
+
+        return html`
+                                    <tr key=${ index } className="schema-row">
+                                        <td className="field-name">
+                                            <span className="field-name-text">${ col.name }</span>
+                                            ${ col.primary ? html`<span className="primary-badge">PK</span>` : '' }
+                                        </td>
+                                        <td className="field-type">
+                                            <span className="type-badge type-${ col.type.toLowerCase().replace( /[^a-z]/g, '' ) }">${ col.type }</span>
+                                        </td>
+                                        <td className="field-constraints">
+                                            ${ constraints.length > 0 ?
+                constraints.map( c => html`<span key=${ c } className="constraint-badge">${ c }</span>` ) :
+                html`<span className="no-constraints">—</span>`
+            }
+                                        </td>
+                                        <td className="field-default">
+                                            ${ col.default ?
+                html`<span className="default-value">${ col.default }</span>` :
+                html`<span className="no-default">—</span>`
+            }
+                                        </td>
+                                        <td className="field-description">
+                                            <span className="description-text">${ getFieldDescription( col.name, col.type ) }</span>
+                                        </td>
+                                    </tr>
+                                `;
+    } ) }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     `;
 }
 
-function TabContent ( { activeTab, selectedTable, tableData, tableLoading, tableError, onRefresh, schema, schemaLoading, schemaError, queryResults, queryLoading, queryError, onExecuteQuery } )
+function TabContent ( { activeTab, selectedTable, tableData, tableLoading, tableError, onRefresh, schema, schemaLoading, schemaError } )
 {
     switch ( activeTab )
     {
@@ -576,10 +604,7 @@ function App ()
     const [ schemaLoading, setSchemaLoading ] = useState( false );
     const [ schemaError, setSchemaError ] = useState( null );
 
-    // Query results
-    const [ queryResults, setQueryResults ] = useState( null );
-    const [ queryLoading, setQueryLoading ] = useState( false );
-    const [ queryError, setQueryError ] = useState( null );
+
 
     // Initialize app
     useEffect( () =>
@@ -685,7 +710,7 @@ function App ()
         try
         {
             const result = await api.get( `/schema?table=${ selectedTable }` );
-            setSchema( result.columns || [] );
+            setSchema( result.schema?.columns || [] );
         } catch ( error )
         {
             console.error( 'Failed to load schema:', error );
@@ -736,31 +761,7 @@ function App ()
         }
     };
 
-    const handleExecuteQuery = async ( query ) =>
-    {
-        setQueryLoading( true );
-        setQueryError( null );
-        setQueryResults( null );
 
-        try
-        {
-            const result = await api.post( '/query', { query } );
-            setQueryResults( result );
-        } catch ( error )
-        {
-            console.error( 'Query execution failed:', error );
-            setQueryError( error.message );
-        } finally
-        {
-            setQueryLoading( false );
-        }
-    };
-
-    const handleQuickQuery = ( query ) =>
-    {
-        // Execute query directly in current data tab
-        handleExecuteQuery( query );
-    };
 
     const toggleSidebar = () =>
     {
@@ -778,7 +779,6 @@ function App ()
                     stats=${ stats }
                     statsLoading=${ statsLoading }
                     tableCounts=${ tableCounts }
-                    onQuickQuery=${ handleQuickQuery }
                     collapsed=${ sidebarCollapsed }
                     onToggle=${ toggleSidebar }
                 />
@@ -805,10 +805,6 @@ function App ()
                             schema=${ schema }
                             schemaLoading=${ schemaLoading }
                             schemaError=${ schemaError }
-                            queryResults=${ queryResults }
-                            queryLoading=${ queryLoading }
-                            queryError=${ queryError }
-                            onExecuteQuery=${ handleExecuteQuery }
                         />
                     </div>
                 </main>
