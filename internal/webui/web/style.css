@@ -1,4 +1,4 @@
-/* Database Editor Styles */
+/* PWA Database Editor Styles */
 * {
   margin: 0;
   padding: 0;
@@ -11,6 +11,137 @@ body {
   color: #e0e0e0;
   height: 100vh;
   overflow: hidden;
+  /* PWA safe areas for mobile notches */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* PWA Specific Styles */
+.install-btn {
+  background: linear-gradient(135deg, #ff6b35, #f7931e);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
+}
+
+.install-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+}
+
+.sync-btn {
+  background: #2196F3;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.sync-btn:hover {
+  background: #1976D2;
+  transform: translateY(-1px);
+}
+
+.online-status {
+  padding: 0.3rem 0.8rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(76, 175, 80, 0.2);
+  color: #4CAF50;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.online-status.offline {
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.update-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #2d2d2d;
+  border: 1px solid #ff6b35;
+  border-radius: 12px;
+  padding: 1rem;
+  z-index: 10000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.3s ease-out;
+}
+
+.notification-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.notification-content button {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.notification-content button:first-of-type {
+  background: #ff6b35;
+  color: white;
+}
+
+.notification-content button:last-of-type {
+  background: #404040;
+  color: #e0e0e0;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Responsive PWA Layout */
+@media (max-width: 768px) {
+  .header {
+    padding: 1rem;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .header-main {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .header-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .header h1 {
+    font-size: 1.2rem;
+  }
 }
 
 /* Header */
@@ -18,14 +149,32 @@ body {
   background: #2d2d2d;
   padding: 1rem 2rem;
   border-bottom: 1px solid #404040;
+}
+
+.header-main {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.header-controls {
+  display: flex;
+  gap: 1rem;
   align-items: center;
 }
 
 .header h1 {
   color: #4fc3f7;
   font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-status {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .status {

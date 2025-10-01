@@ -4,7 +4,7 @@ package cmd
 import (
 	"database/sql"
 
-	"github.com/daniel-le97/banned-cli/db"
+	"github.com/daniel-le97/banned-cli/internal/db"
 )
 
 // Database function aliases for backward compatibility

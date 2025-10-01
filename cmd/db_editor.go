@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -14,12 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daniel-le97/banned-cli/db"
+	"github.com/daniel-le97/banned-cli/internal/db"
+	"github.com/daniel-le97/banned-cli/internal/webui"
 	"github.com/spf13/cobra"
 )
 
-//go:embed web/*
-var webFS embed.FS
+// webAssets gets the embedded web UI files from internal package
+var webAssets = webui.GetWebAssets()
 
 // dbEditorCmd represents the db editor command
 var dbEditorCmd = &cobra.Command{
@@ -67,7 +66,7 @@ func init() {
 
 func startWebEditor(port int) error {
 	// Create a sub-filesystem for the web directory from embedded files
-	webSubFS, err := fs.Sub(webFS, "web")
+	webSubFS, err := webAssets.Sub("web")
 	if err != nil {
 		return fmt.Errorf("failed to create web sub-filesystem: %w", err)
 	}
@@ -77,7 +76,7 @@ func startWebEditor(port int) error {
 
 	// Serve main page
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		indexHTML, err := webFS.ReadFile("web/index.html")
+		indexHTML, err := webAssets.ReadFile("web/index.html")
 		if err != nil {
 			http.Error(w, "Failed to read index.html: "+err.Error(), http.StatusInternalServerError)
 			return

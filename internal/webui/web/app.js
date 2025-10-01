@@ -2,6 +2,131 @@ import { render } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { html } from 'htm/preact';
 
+// PWA Service Worker Registration and ESM Management
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/web/sw.js')
+            .then(registration => {
+                console.log('✅ SW registered successfully:', registration.scope);
+                
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // Show update notification
+                            showUpdateNotification();
+                        }
+                    });
+                });
+                
+                // Pre-cache ESM imports when online
+                if (navigator.onLine) {
+                    precacheESMImports();
+                }
+            })
+            .catch(error => {
+                console.error('❌ SW registration failed:', error);
+            });
+    });
+}
+
+// Pre-cache ESM imports for offline use
+async function precacheESMImports() {
+    if ('caches' in window) {
+        try {
+            const cache = await caches.open('banned-cli-esm-v1');
+            const esmUrls = [
+                'https://esm.sh/preact@10.23.1',
+                'https://esm.sh/preact@10.23.1/hooks',
+                'https://esm.sh/htm@3.1.1/preact?external=preact'
+            ];
+            
+            console.log('📦 Pre-caching ESM imports...');
+            await cache.addAll(esmUrls);
+            console.log('✅ ESM imports cached successfully');
+        } catch (error) {
+            console.warn('⚠️ Failed to pre-cache ESM imports:', error);
+        }
+    }
+}
+
+// PWA Install Prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('💡 PWA install prompt available');
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallButton();
+});
+
+// PWA Installation Functions
+function showInstallButton() {
+    const installBtn = document.getElementById('install-btn');
+    if (installBtn) {
+        installBtn.style.display = 'block';
+        installBtn.addEventListener('click', installPWA);
+    }
+}
+
+async function installPWA() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`PWA install outcome: ${outcome}`);
+        deferredPrompt = null;
+        hideInstallButton();
+    }
+}
+
+function hideInstallButton() {
+    const installBtn = document.getElementById('install-btn');
+    if (installBtn) {
+        installBtn.style.display = 'none';
+    }
+}
+
+function showUpdateNotification() {
+    const notification = document.createElement('div');
+    notification.className = 'update-notification';
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span>🔄 New version available!</span>
+            <button onclick="updateApp()">Update</button>
+            <button onclick="this.parentElement.parentElement.remove()">Later</button>
+        </div>
+    `;
+    document.body.appendChild(notification);
+}
+
+window.updateApp = function() {
+    if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+        window.location.reload();
+    }
+};
+
+// PWA Background Sync
+function requestBackgroundSync() {
+    if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+        navigator.serviceWorker.ready.then(registration => {
+            return registration.sync.register('background-sync-data');
+        }).catch(console.error);
+    }
+}
+
+// Network Status Detection
+function updateOnlineStatus() {
+    const indicator = document.getElementById('online-status');
+    if (indicator) {
+        indicator.textContent = navigator.onLine ? '🟢 Online' : '🔴 Offline';
+        indicator.className = navigator.onLine ? 'online' : 'offline';
+    }
+}
+
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
 // Helper function to get default search field for tables
 function getDefaultSearchField ( tableName )
 {
@@ -47,11 +172,26 @@ function Header ( { status, stats } )
 {
     return html`
         <header className="header">
-            <h1>Database Editor</h1>
-            <div className=${ `status ${ status === 'connected' ? '' : 'error' }` }>
-                <span className="indicator">${ status === 'connected' ? '●' : '●' }</span>
-                <span>${ status === 'connected' ? 'Connected' : 'Disconnected' }</span>
-                ${ stats && html`<span> • ${ stats.tables } tables</span>` }
+            <div className="header-main">
+                <h1>🚫 Banned CLI Dashboard</h1>
+                <div className="header-controls">
+                    <button id="install-btn" className="install-btn" style="display: none;">
+                        📱 Install App
+                    </button>
+                    <button onclick=${() => requestBackgroundSync()} className="sync-btn" title="Sync Data">
+                        🔄 Sync
+                    </button>
+                    <div id="online-status" className="online-status">
+                        ${navigator.onLine ? '🟢 Online' : '🔴 Offline'}
+                    </div>
+                </div>
+            </div>
+            <div className="header-status">
+                <div className=${ `status ${ status === 'connected' ? '' : 'error' }` }>
+                    <span className="indicator">${ status === 'connected' ? '●' : '●' }</span>
+                    <span>${ status === 'connected' ? 'Connected' : 'Disconnected' }</span>
+                    ${ stats && html`<span> • ${ stats.tables } tables</span>` }
+                </div>
             </div>
         </header>
     `;

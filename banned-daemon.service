@@ -1,0 +1,41 @@
+[Unit]
+Description=Banned CLI Daemon
+Documentation=https://github.com/daniel-le97/banned-cli
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=banned
+Group=banned
+WorkingDirectory=/home/banned/.local/share
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=HOME=/home/banned/.local/share
+
+# Daemon configuration
+ExecStart=/usr/local/bin/banned daemon --webui --port 3000 --auto-sync --interval 1h --log-file /var/log/banned/daemon.log --pid-file /var/run/banned/banned.pid
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/log/banned /var/run/banned /home/banned/.local/share/banned
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Resource limits
+MemoryLimit=512M
+TasksMax=50
+
+# Logging
+StandardOutput=append:/var/log/banned/daemon.log
+StandardError=append:/var/log/banned/daemon.log
+
+[Install]
+WantedBy=multi-user.target

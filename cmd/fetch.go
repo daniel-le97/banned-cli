@@ -10,7 +10,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/daniel-le97/banned-cli/tui"
+	"github.com/daniel-le97/banned-cli/internal/tui"
 	"github.com/spf13/cobra"
 )
 
