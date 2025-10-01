@@ -1,0 +1,37 @@
+<div class="schema-container">
+    <div class="schema-header">
+        <h3>Table Schema: {{.TableName}}</h3>
+        <p class="schema-description">Fields and data types for records in this table</p>
+    </div>
+    <div class="table-wrapper">
+        <table class="schema-table">
+            <thead>
+                <tr>
+                    <th>Field Name</th>
+                    <th>Data Type</th>
+                    <th>Constraints</th>
+                    <th>Default Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Columns}}
+                <tr>
+                    <td>
+                        <span class="field-name">{{.Name}}</span>
+                        {{if .Primary}}<span class="primary-badge">PK</span>{{end}}
+                    </td>
+                    <td><span class="type-badge">{{.Type}}</span></td>
+                    <td>
+                        {{if .Primary}}<span class="constraint-badge">PRIMARY KEY</span>{{end}}
+                        {{if .NotNull}}<span class="constraint-badge">NOT NULL</span>{{end}}
+                        {{if and (not .Primary) (not .NotNull)}}—{{end}}
+                    </td>
+                    <td>{{if .Default}}{{.Default}}
+                        {{else}}—{{end}}
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>

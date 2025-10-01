@@ -1,0 +1,19 @@
+<div class="stats-content">
+    <h3>Database Statistics</h3>
+    <div class="stats-grid">
+        {{range .Stats}}
+        <div class="stat-card">
+            <span class="stat-value">{{.Count}}</span>
+            <span class="stat-label">{{.Name}}</span>
+        </div>
+        {{end}}
+        <div class="stat-card">
+            <span class="stat-value">{{.TotalRecords}}</span>
+            <span class="stat-label">Total Records</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-value">{{.FileSize}}</span>
+            <span class="stat-label">File Size</span>
+        </div>
+    </div>
+</div>

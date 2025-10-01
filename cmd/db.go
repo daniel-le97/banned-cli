@@ -105,4 +105,6 @@ func init() {
 	rootCmd.AddCommand(dbCmd)
 	dbCmd.AddCommand(dbStatusCmd)
 	dbCmd.AddCommand(dbViewCmd)
+	dbCmd.AddCommand(dbEditorHtmxCmd)
+	dbEditorHtmxCmd.Flags().IntP("port", "p", 8080, "Port for the web server")
 }

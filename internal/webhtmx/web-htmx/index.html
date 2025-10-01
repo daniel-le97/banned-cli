@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4fc3f7">
+    <meta name="description" content="SQLite Database Editor with HTMX interface">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/web-htmx/manifest.json">
+
+    <!-- Icons for different platforms -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/web-htmx/icons/icon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/web-htmx/icons/icon-16x16.png">
+    <link rel="apple-touch-icon" href="/web-htmx/icons/icon-192x192.png">
+
+    <!-- iOS PWA meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DB Editor">
+
+    <!-- Windows/IE PWA meta tags -->
+    <meta name="msapplication-TileColor" content="#4fc3f7">
+    <meta name="msapplication-TileImage" content="/web-htmx/icons/icon-144x144.png">
+
+    <title>Database Editor - HTMX</title>
+    <link rel="stylesheet" href="/web-htmx/style.css">
+    <script src="/web-htmx/htmx.js"></script>
+    <script src="/web-htmx/hyperscript.js"></script>
+    <script src="/web-htmx/app.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>Database Editor (HTMX)</h1>
+            <div class="status" hx-get="/api/health" hx-trigger="load, every 30s" hx-target="this" hx-swap="innerHTML">
+                <span class="indicator">●</span>
+                <span>Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="layout">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <button class="sidebar-toggle" _="on click toggle .collapsed on #sidebar" title="Toggle sidebar">
+                    ←
+                </button>
+
+                <div class="sidebar-content">
+                    <!-- Database Stats -->
+                    <div class="stats-section" hx-get="/htmx/stats" hx-trigger="load, every 60s" hx-target="this"
+                        hx-swap="innerHTML">
+                        <div class="loading stats-loading">
+                            <div>
+                                <h3 style="color: #4fc3f7; margin-bottom: 0.75rem; font-size: 1rem;">Database Statistics
+                                </h3>
+                                <div style="opacity: 0.6;">Loading stats...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tables List -->
+                    <div class="tables-section" hx-get="/htmx/tables" hx-trigger="load" hx-target="this"
+                        hx-swap="innerHTML">
+                        <div class="loading tables-loading">
+                            <div>
+                                <h3 style="color: #ffb74d; margin-bottom: 0.75rem; font-size: 1rem;">Database Tables
+                                </h3>
+                                <div style="opacity: 0.6;">Loading tables...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" hx-get="/htmx/tab/data" hx-target="#tab-content" hx-swap="innerHTML"
+                        _="on click remove .active from .tab then add .active to me">
+                        Data
+                    </button>
+                    <button class="tab" hx-get="/htmx/tab/schema" hx-target="#tab-content" hx-swap="innerHTML"
+                        _="on click remove .active from .tab then add .active to me">
+                        Schema
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div id="tab-content" class="tab-content">
+                    <div class="placeholder">
+                        <h3>Select a Table</h3>
+                        <p>Choose a table from the sidebar to view its data or schema.</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+
+</body>
+
+</html>

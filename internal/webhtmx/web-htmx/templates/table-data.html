@@ -1,0 +1,40 @@
+<div class="data-container">
+    <div class="table-header">
+        <h3 class="table-title">Table: {{.TableName}}</h3>
+        <div class="table-controls">
+            <input type="text" class="search-box" placeholder="Search..." hx-post="/htmx/search/{{.TableName}}"
+                hx-target=".table-wrapper" hx-swap="innerHTML" hx-trigger="keyup changed delay:300ms">
+            <button class="btn btn-refresh" hx-get="/htmx/table/data/{{.TableName}}" hx-target="#tab-content"
+                hx-swap="innerHTML">
+                Refresh
+            </button>
+        </div>
+    </div>
+    <div class="table-wrapper">
+        {{if .Data}}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    {{range .Columns}}
+                    <th>{{.}}</th>
+                    {{end}}
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Data}}
+                {{$row := .}}
+                <tr>
+                    {{range $.Columns}}
+                    <td class="copyable-cell" title="Click to copy to clipboard">{{index $row .}}</td>
+                    {{end}}
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+            <div class="placeholder">
+                <p>No data found in this table.</p>
+            </div>
+            {{end}}
+    </div>
+</div>

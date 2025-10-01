@@ -1,0 +1,14 @@
+<div class="tables-content">
+    <h3>Database Tables</h3>
+    <ul class="table-list">
+        {{range .}}
+        <li class="table-item" hx-get="/htmx/table/data/{{.Name}}" hx-target="#tab-content" hx-swap="innerHTML" _="on click remove .active from .table-item then add .active to me
+	           on click set window.selectedTable to '{{.Name}}'">
+            <div class="table-link">
+                <div class="table-name">{{.Name}}</div>
+                <div class="table-count">{{.Count}} records</div>
+            </div>
+        </li>
+        {{end}}
+    </ul>
+</div>
