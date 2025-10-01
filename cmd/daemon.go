@@ -51,7 +51,7 @@ Examples:
   banned daemon --auto-sync --interval 2h              # Auto-sync every 2 hours
   banned daemon --webui --auto-sync --interval 30m     # Both services
   banned daemon --pid-file /var/run/banned.pid         # Write PID file`,
-	
+
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runDaemon(daemonConfig)
 	},
@@ -65,7 +65,7 @@ func init() {
 	daemonCmd.Flags().StringVar(&daemonConfig.WebUIPort, "port", "8080", "Port for web UI server")
 	daemonCmd.Flags().BoolVar(&daemonConfig.AutoSync, "auto-sync", false, "Enable automatic periodic syncing")
 	daemonCmd.Flags().DurationVar(&daemonConfig.SyncInterval, "interval", 1*time.Hour, "Sync interval (e.g., 30m, 1h, 2h)")
-	
+
 	// System daemon flags
 	daemonCmd.Flags().StringVar(&daemonConfig.PidFile, "pid-file", "", "Write daemon PID to file")
 	daemonCmd.Flags().StringVar(&daemonConfig.LogFile, "log-file", "", "Log daemon output to file")
@@ -103,7 +103,7 @@ func runDaemon(config DaemonConfig) error {
 
 	// Start services
 	var wg sync.WaitGroup
-	
+
 	if config.WebUI {
 		wg.Add(1)
 		go func() {
@@ -142,58 +142,58 @@ func runDaemon(config DaemonConfig) error {
 
 func runWebUIService(ctx context.Context, port string) error {
 	log.Printf("🌐 Starting PWA Web UI service on port %s", port)
-	
+
 	// Create HTTP server with PWA support
 	srv := &http.Server{
-		Addr: ":" + port,
+		Addr:    ":" + port,
 		Handler: createPWAHandler(),
 	}
-	
+
 	// Start server in goroutine
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("❌ Web server error: %v", err)
 		}
 	}()
-	
+
 	log.Printf("✅ PWA Web UI available at: http://localhost:%s", port)
 	log.Printf("📱 Install as app for better experience!")
-	
+
 	// Wait for shutdown
 	<-ctx.Done()
 	log.Println("🛑 Shutting down Web UI service...")
-	
+
 	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	return srv.Shutdown(shutdownCtx)
 }
 
 func createPWAHandler() http.Handler {
 	mux := http.NewServeMux()
-	
+
 	// Serve PWA static files with proper headers
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Set PWA headers
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 		w.Header().Set("Service-Worker-Allowed", "/")
-		
+
 		// Handle root path
 		if r.URL.Path == "/" {
 			http.ServeFile(w, r, "internal/webui/web/index.html")
 			return
 		}
-		
+
 		// Serve static files
 		http.ServeFile(w, r, "internal/webui/web"+r.URL.Path)
 	})
-	
+
 	// API endpoints for PWA functionality
 	mux.HandleFunc("/api/sync/channels", handleSyncChannels)
 	mux.HandleFunc("/api/sync/videos", handleSyncVideos)
 	mux.HandleFunc("/api/daemon/status", handleDaemonStatus)
-	
+
 	return mux
 }
 
@@ -202,17 +202,17 @@ func handleSyncChannels(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	// Trigger channel sync
 	log.Println("� API: Syncing channels...")
-	
+
 	// Simulate sync work
 	time.Sleep(1 * time.Second)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Channels synced successfully",
+		"success":   true,
+		"message":   "Channels synced successfully",
 		"timestamp": time.Now().Unix(),
 	})
 }
@@ -222,17 +222,17 @@ func handleSyncVideos(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	// Trigger video sync
 	log.Println("🔄 API: Syncing videos...")
-	
+
 	// Simulate sync work
 	time.Sleep(2 * time.Second)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Videos synced successfully", 
+		"success":   true,
+		"message":   "Videos synced successfully",
 		"timestamp": time.Now().Unix(),
 	})
 }
@@ -244,7 +244,7 @@ func handleDaemonStatus(w http.ResponseWriter, r *http.Request) {
 		"uptime": time.Since(time.Now()).Seconds(), // This would be actual uptime
 		"services": map[string]bool{
 			"webui": true,
-			"sync": daemonConfig.AutoSync,
+			"sync":  daemonConfig.AutoSync,
 		},
 		"timestamp": time.Now().Unix(),
 	})
@@ -252,15 +252,15 @@ func handleDaemonStatus(w http.ResponseWriter, r *http.Request) {
 
 func runAutoSyncService(ctx context.Context, interval time.Duration) {
 	log.Printf("🔄 Starting auto-sync service (interval: %v)", interval)
-	
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	
+
 	// Run initial sync
 	if err := performSync(); err != nil {
 		log.Printf("❌ Initial sync failed: %v", err)
 	}
-	
+
 	for {
 		select {
 		case <-ctx.Done():

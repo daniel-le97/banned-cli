@@ -5,30 +5,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Banned CLI Dashboard</title>
-    
+
     <!-- PWA Meta Tags -->
     <meta name="application-name" content="Banned CLI Dashboard">
     <meta name="description" content="Progressive Web App for managing banned.video content">
     <meta name="theme-color" content="#ff6b35">
     <meta name="color-scheme" content="dark light">
-    
+
     <!-- PWA Manifest -->
     <link rel="manifest" href="/web/manifest.json">
-    
+
     <!-- Apple PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="BannedCLI">
     <link rel="apple-touch-icon" href="/web/icon-apple-touch.png">
-    
+
     <!-- Microsoft PWA Meta Tags -->
     <meta name="msapplication-TileColor" content="#ff6b35">
     <meta name="msapplication-tap-highlight" content="no">
-    
+
     <!-- Icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="/web/icon-192.png">
     <link rel="icon" type="image/png" sizes="512x512" href="/web/icon-512.png">
-    
+
     <link rel="stylesheet" href="/web/style.css">
     <!-- Dynamic import map based on online/offline status -->
     <script>
@@ -42,18 +42,18 @@
         } : {
             "imports": {
                 "preact": "/web/vendor/preact.js",
-                "preact/hooks": "/web/vendor/preact-hooks.js", 
+                "preact/hooks": "/web/vendor/preact-hooks.js",
                 "htm/preact": "/web/vendor/htm-preact.js"
             }
         };
-        
+
         // Inject import map
-        const script = document.createElement('script');
+        const script = document.createElement( 'script' );
         script.type = 'importmap';
-        script.textContent = JSON.stringify(importMap);
-        document.head.appendChild(script);
-        
-        console.log('📦 Import map loaded:', navigator.onLine ? 'online (CDN)' : 'offline (local)');
+        script.textContent = JSON.stringify( importMap );
+        document.head.appendChild( script );
+
+        console.log( '📦 Import map loaded:', navigator.onLine ? 'online (CDN)' : 'offline (local)' );
     </script>
 </head>
 

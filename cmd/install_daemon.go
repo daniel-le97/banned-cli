@@ -112,7 +112,7 @@ func generateInstallScript() error {
 
 	// Generate systemd service content
 	serviceContent := generateSystemdService()
-	
+
 	// Generate install script content
 	scriptContent := generateInstallScriptContent()
 
@@ -148,7 +148,7 @@ func generateSystemdService() string {
 	if installDaemonConfig.AutoSync {
 		daemonArgs += fmt.Sprintf(" --auto-sync --interval %s", installDaemonConfig.SyncInterval)
 	}
-	daemonArgs += fmt.Sprintf(" --log-file %s/daemon.log --pid-file %s/banned.pid", 
+	daemonArgs += fmt.Sprintf(" --log-file %s/daemon.log --pid-file %s/banned.pid",
 		installDaemonConfig.LogDir, installDaemonConfig.RunDir)
 
 	return fmt.Sprintf(`[Unit]
@@ -193,9 +193,9 @@ StandardError=append:%s/daemon.log
 [Install]
 WantedBy=multi-user.target
 `, installDaemonConfig.ServiceUser, installDaemonConfig.ServiceGroup,
-	filepath.Dir(installDaemonConfig.DataDir), filepath.Dir(installDaemonConfig.DataDir),
-	daemonArgs, installDaemonConfig.LogDir, installDaemonConfig.RunDir, installDaemonConfig.DataDir,
-	installDaemonConfig.LogDir, installDaemonConfig.LogDir)
+		filepath.Dir(installDaemonConfig.DataDir), filepath.Dir(installDaemonConfig.DataDir),
+		daemonArgs, installDaemonConfig.LogDir, installDaemonConfig.RunDir, installDaemonConfig.DataDir,
+		installDaemonConfig.LogDir, installDaemonConfig.LogDir)
 }
 
 func generateInstallScriptContent() string {
@@ -387,7 +387,7 @@ func executeInstallScript() error {
 
 	// Execute the install script
 	fmt.Printf("🚀 Executing installation script...\n\n")
-	
+
 	cmd := exec.Command("bash", installDaemonConfig.OutputPath, "install")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
