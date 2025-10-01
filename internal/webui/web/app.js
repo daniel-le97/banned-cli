@@ -109,7 +109,7 @@ function showUpdateNotification ()
 {
     const notification = document.createElement( 'div' );
     notification.className = 'update-notification';
-    notification.innerHTML = `
+    notification.innerHTML = html`
         <div class="notification-content">
             <span>🔄 New version available!</span>
             <button onclick="updateApp()">Update</button>
