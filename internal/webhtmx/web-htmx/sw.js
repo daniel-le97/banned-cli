@@ -3,13 +3,14 @@
  * Handles caching, offline functionality, and background sync
  */
 
-const CACHE_NAME = 'db-editor-htmx-v2';
-const STATIC_CACHE = 'static-v2';
-const API_CACHE = 'api-v2';
+const CACHE_NAME = 'db-editor-htmx-v3';
+const STATIC_CACHE = 'static-v3';
+const API_CACHE = 'api-v3';
 
 // Files to cache for offline use
 const STATIC_FILES = [
     '/htmx/',
+    '/web-htmx/index.html',
     '/web-htmx/style.css',
     '/web-htmx/app.js',
     '/web-htmx/htmx.js',
@@ -209,64 +210,160 @@ async function handleStaticFile ( request )
 
 /**
  * Handle API requests
- * Network-first strategy with cache fallback
+ * Network-first strategy with cache fallback and enhanced offline support
  * @param {Request} request
  * @returns {Promise<Response>}
  */
 async function handleAPIRequest ( request )
 {
+    const url = new URL( request.url );
+
     try
     {
-        // Try network first for fresh data
-        const networkResponse = await fetch( request );
+        // Try network first for fresh data with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout( () => controller.abort(), 10000 ); // 10 second timeout
+
+        const networkResponse = await fetch( request, {
+            signal: controller.signal
+        } );
+
+        clearTimeout( timeoutId );
 
         if ( networkResponse.ok )
         {
             // Cache successful API responses
             const cache = await caches.open( API_CACHE );
             cache.put( request, networkResponse.clone() );
+
+            // Notify main app of successful connection
+            notifyMainApp( 'connection-restored' );
+
             return networkResponse;
         }
 
-        // If network fails, try cache
-        const cachedResponse = await caches.match( request );
-        if ( cachedResponse )
-        {
-            // Add offline indicator header
-            const response = cachedResponse.clone();
-            response.headers.append( 'X-Served-By', 'ServiceWorker-Cache' );
-            return response;
-        }
-
-        return networkResponse;
+        // Server responded with error - try cache
+        throw new Error( `Server error: ${ networkResponse.status }` );
     } catch ( error )
     {
-        console.error( 'API fetch failed:', error );
+        console.log( 'API fetch failed:', error.name, error.message );
+
+        // Notify main app of connection issue
+        notifyMainApp( 'connection-failed' );
 
         // Try cached version
         const cachedResponse = await caches.match( request );
         if ( cachedResponse )
         {
-            return cachedResponse;
+            // Add headers to indicate cached response
+            const response = new Response( cachedResponse.body, {
+                status: cachedResponse.status,
+                statusText: cachedResponse.statusText,
+                headers: {
+                    ...cachedResponse.headers,
+                    'X-Served-By': 'ServiceWorker-Cache',
+                    'X-Cache-Date': cachedResponse.headers.get( 'date' ) || 'unknown'
+                }
+            } );
+
+            return response;
         }
 
-        // Return offline message for specific endpoints
-        if ( request.url.includes( '/htmx/stats' ) )
+        // Return appropriate offline responses for different endpoints
+        if ( url.pathname.includes( '/htmx/stats' ) )
+        {
+            return createOfflineStatsResponse();
+        }
+
+        if ( url.pathname.includes( '/htmx/tables' ) )
+        {
+            return createOfflineTablesResponse();
+        }
+
+        if ( url.pathname.includes( '/api/health' ) )
         {
             return new Response( JSON.stringify( {
-                offline: true,
-                message: 'Server offline - showing cached data'
+                status: 'offline',
+                timestamp: new Date().toISOString()
             } ), {
                 headers: { 'Content-Type': 'application/json' },
                 status: 503
             } );
         }
 
-        return new Response( 'Offline', {
+        return new Response( 'Server unavailable', {
             status: 503,
             statusText: 'Service Unavailable'
         } );
     }
+}
+
+/**
+ * Create offline stats response
+ * @returns {Response}
+ */
+function createOfflineStatsResponse ()
+{
+    const offlineStats = `
+        <div class="stats-section">
+            <h3 style="color: #4fc3f7; margin-bottom: 0.75rem; font-size: 1rem;">
+                Database Statistics
+            </h3>
+            <div class="htmx-request-error">Server offline - stats unavailable</div>
+        </div>
+    `;
+
+    return new Response( offlineStats, {
+        headers: {
+            'Content-Type': 'text/html',
+            'X-Served-By': 'ServiceWorker-Offline'
+        },
+        status: 503
+    } );
+}
+
+/**
+ * Create offline tables response
+ * @returns {Response}
+ */
+function createOfflineTablesResponse ()
+{
+    const offlineTables = `
+        <div class="tables-section">
+            <h3 style="color: #ffb74d; margin-bottom: 0.75rem; font-size: 1rem;">
+                Database Tables
+            </h3>
+            <div class="htmx-request-error">Server offline - tables unavailable</div>
+        </div>
+    `;
+
+    return new Response( offlineTables, {
+        headers: {
+            'Content-Type': 'text/html',
+            'X-Served-By': 'ServiceWorker-Offline'
+        },
+        status: 503
+    } );
+}
+
+/**
+ * Notify main application of connection events
+ * @param {string} event - Event type
+ */
+function notifyMainApp ( event )
+{
+    // Send message to all clients
+    self.clients.matchAll().then( clients =>
+    {
+        clients.forEach( client =>
+        {
+            client.postMessage( {
+                type: 'sw-event',
+                event: event,
+                timestamp: Date.now()
+            } );
+        } );
+    } );
 }
 
 /**

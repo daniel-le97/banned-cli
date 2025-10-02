@@ -29,6 +29,21 @@
 window.selectedTable = null;
 
 /**
+ * Connection state management
+ * @type {Object}
+ */
+window.connectionState = {
+    isOnline: navigator.onLine,
+    lastSuccessfulRequest: Date.now(),
+    retryCount: 0,
+    maxRetries: 1, // Only try once before showing offline
+    retryInterval: 3000, // 3 seconds
+    healthCheckInterval: 15000, // 15 seconds
+    isHealthChecking: false,
+    offlineMode: false
+};
+
+/**
  * Main application initialization
  * Sets up event listeners and HTMX configuration when DOM is ready
  */
@@ -53,6 +68,21 @@ function setupHTMXConfiguration ()
         function ( evt )
         {
             evt.detail.headers[ 'HX-Request' ] = 'true';
+            // Add timestamp for request tracking
+            evt.detail.headers[ 'X-Request-Time' ] = Date.now().toString();
+        }
+    );
+
+    // Handle successful HTMX requests
+    document.body.addEventListener( 'htmx:afterRequest',
+        /** @param {HTMXEvent} evt - HTMX after request event */
+        function ( evt )
+        {
+            if ( evt.detail.xhr.status >= 200 && evt.detail.xhr.status < 300 )
+            {
+                // Successful request - update connection state
+                handleSuccessfulConnection();
+            }
         }
     );
 
@@ -62,6 +92,27 @@ function setupHTMXConfiguration ()
         function ( evt )
         {
             console.error( 'HTMX Error:', evt.detail );
+            handleConnectionError( evt.detail.xhr );
+        }
+    );
+
+    // Handle network errors (when server is completely unreachable)
+    document.body.addEventListener( 'htmx:sendError',
+        /** @param {HTMXErrorEvent} evt - HTMX send error event */
+        function ( evt )
+        {
+            console.error( 'HTMX Network Error:', evt.detail );
+            handleNetworkError();
+        }
+    );
+
+    // Handle timeout errors
+    document.body.addEventListener( 'htmx:timeout',
+        /** @param {HTMXErrorEvent} evt - HTMX timeout event */
+        function ( evt )
+        {
+            console.error( 'HTMX Timeout:', evt.detail );
+            handleTimeoutError();
         }
     );
 }
@@ -254,6 +305,9 @@ function registerServiceWorker ()
                 // Handle offline/online events
                 setupOfflineDetection();
 
+                // Listen for service worker messages
+                setupServiceWorkerMessages();
+
             } catch ( error )
             {
                 console.error( 'Service Worker registration failed:', error );
@@ -295,8 +349,8 @@ function showUpdateNotification ()
 }
 
 /**
- * Set up offline/online event detection
- * Show connection status to user
+ * Set up enhanced offline/online event detection with server health monitoring
+ * Show detailed connection status to user and handle offline mode
  */
 function setupOfflineDetection ()
 {
@@ -304,22 +358,33 @@ function setupOfflineDetection ()
 
     function updateConnectionStatus ()
     {
-        if ( navigator.onLine )
+        const state = window.connectionState;
+
+        if ( !navigator.onLine )
         {
+            // Browser reports offline
+            console.log( 'Browser is offline' );
+            state.isOnline = false;
+            state.offlineMode = true;
+            updateStatusDisplay( statusElement, 'offline', 'No Internet Connection' );
+            showOfflineMessage();
+        }
+        else if ( state.offlineMode )
+        {
+            // Browser came back online, but we need to check server
+            console.log( 'Browser back online - checking server...' );
+            state.isOnline = true;
+            updateStatusDisplay( statusElement, 'checking', 'Reconnecting...' );
+            checkServerHealth();
+        }
+        else
+        {
+            // Normal online state
             console.log( 'App is online' );
-            if ( statusElement )
-            {
-                statusElement.classList.remove( 'error' );
-                statusElement.innerHTML = '<span class="indicator">●</span><span>Connected</span>';
-            }
-        } else
-        {
-            console.log( 'App is offline' );
-            if ( statusElement )
-            {
-                statusElement.classList.add( 'error' );
-                statusElement.innerHTML = '<span class="indicator">●</span><span>Offline</span>';
-            }
+            state.isOnline = true;
+            state.offlineMode = false;
+            updateStatusDisplay( statusElement, 'online', 'Connected' );
+            hideOfflineMessage();
         }
     }
 
@@ -329,4 +394,252 @@ function setupOfflineDetection ()
     // Listen for connection changes
     window.addEventListener( 'online', updateConnectionStatus );
     window.addEventListener( 'offline', updateConnectionStatus );
+
+    // Start periodic health checks
+    startHealthChecks();
+}
+
+/**
+ * Handle successful connection - reset retry counters and update state
+ */
+function handleSuccessfulConnection ()
+{
+    const state = window.connectionState;
+    state.lastSuccessfulRequest = Date.now();
+    state.retryCount = 0;
+    state.isOnline = true;
+
+    if ( state.offlineMode )
+    {
+        state.offlineMode = false;
+        const statusElement = document.querySelector( '.status' );
+        updateStatusDisplay( statusElement, 'online', 'Connected' );
+        hideOfflineMessage();
+        console.log( 'Connection restored!' );
+    }
+}
+
+/**
+ * Handle connection errors (4xx, 5xx responses)
+ * @param {XMLHttpRequest} xhr - The failed request
+ */
+function handleConnectionError ( xhr )
+{
+    const state = window.connectionState;
+    const timeSinceLastSuccess = Date.now() - state.lastSuccessfulRequest;
+
+    // If it's been more than 30 seconds since last successful request, consider it a connection issue
+    if ( timeSinceLastSuccess > 30000 && xhr.status >= 500 )
+    {
+        handleServerUnavailable();
+    }
+}
+
+/**
+ * Handle network errors (server completely unreachable)
+ */
+function handleNetworkError ()
+{
+    console.log( 'Network error - server may be offline' );
+    handleServerUnavailable();
+}
+
+/**
+ * Handle timeout errors
+ */
+function handleTimeoutError ()
+{
+    console.log( 'Request timeout - server may be slow or offline' );
+    handleServerUnavailable();
+}
+
+/**
+ * Handle server unavailable state
+ */
+function handleServerUnavailable ()
+{
+    const state = window.connectionState;
+    const statusElement = document.querySelector( '.status' );
+
+    if ( navigator.onLine && !state.offlineMode )
+    {
+        state.retryCount++;
+        console.log( `Server unavailable (attempt ${ state.retryCount }/${ state.maxRetries })` );
+
+        if ( state.retryCount >= state.maxRetries )
+        {
+            // Enter offline mode after max retries
+            state.offlineMode = true;
+            updateStatusDisplay( statusElement, 'server-offline', 'Server Offline' );
+            showOfflineMessage( 'Server is offline. Please restart the banned-cli application.' );
+        }
+        else
+        {
+            // Show retry state briefly
+            updateStatusDisplay( statusElement, 'retrying', 'Reconnecting...' );
+            setTimeout( () => checkServerHealth(), state.retryInterval );
+        }
+    }
+}
+
+/**
+ * Update the status display element
+ * @param {HTMLElement} statusElement - The status display element
+ * @param {string} state - The connection state (online, offline, checking, retrying, server-offline)
+ * @param {string} message - The status message to display
+ */
+function updateStatusDisplay ( statusElement, state, message )
+{
+    if ( !statusElement ) return;
+
+    // Remove all state classes
+    statusElement.classList.remove( 'error', 'offline', 'checking', 'retrying', 'server-offline' );
+
+    // Add appropriate class
+    if ( state !== 'online' )
+    {
+        statusElement.classList.add( state );
+    }
+
+    // Update content
+    statusElement.innerHTML = `<span class="indicator">●</span><span>${ message }</span>`;
+}
+
+/**
+ * Start periodic health checks
+ */
+function startHealthChecks ()
+{
+    setInterval( () =>
+    {
+        const state = window.connectionState;
+        const timeSinceLastSuccess = Date.now() - state.lastSuccessfulRequest;
+
+        // If we haven't had a successful request in a while and we're not already checking
+        if ( timeSinceLastSuccess > state.healthCheckInterval && !state.isHealthChecking && navigator.onLine )
+        {
+            checkServerHealth();
+        }
+    }, state.healthCheckInterval );
+}
+
+/**
+ * Check server health with a lightweight request
+ */
+function checkServerHealth ()
+{
+    const state = window.connectionState;
+    if ( state.isHealthChecking ) return;
+
+    state.isHealthChecking = true;
+
+    fetch( '/api/health', {
+        method: 'GET',
+        headers: { 'X-Health-Check': 'true' },
+        cache: 'no-cache',
+        timeout: 5000
+    } )
+        .then( response =>
+        {
+            if ( response.ok )
+            {
+                handleSuccessfulConnection();
+            }
+            else
+            {
+                throw new Error( `Health check failed: ${ response.status }` );
+            }
+        } )
+        .catch( error =>
+        {
+            console.log( 'Health check failed:', error );
+            handleServerUnavailable();
+        } )
+        .finally( () =>
+        {
+            state.isHealthChecking = false;
+        } );
+}
+
+/**
+ * Show offline notification banner
+ * @param {string} customMessage - Optional custom message
+ */
+function showOfflineMessage ( customMessage )
+{
+    // Remove existing offline message
+    hideOfflineMessage();
+
+    const message = customMessage || 'Server is offline. Please restart the application.';
+
+    const offlineBanner = document.createElement( 'div' );
+    offlineBanner.id = 'offline-banner';
+    offlineBanner.className = 'offline-banner';
+    offlineBanner.innerHTML = `
+        <div class="offline-banner-content">
+            <span class="offline-banner-icon">⚠️</span>
+            <span class="offline-banner-message">${ message }</span>
+            <button onclick="window.location.reload()" class="offline-banner-button">Retry</button>
+            <button onclick="hideOfflineMessage()" class="offline-banner-close">×</button>
+        </div>
+    `;
+
+    document.body.appendChild( offlineBanner );
+
+    // Show with animation
+    setTimeout( () =>
+    {
+        offlineBanner.classList.add( 'show' );
+    }, 100 );
+}
+
+/**
+ * Hide offline notification banner
+ */
+function hideOfflineMessage ()
+{
+    const existingBanner = document.getElementById( 'offline-banner' );
+    if ( existingBanner )
+    {
+        existingBanner.classList.remove( 'show' );
+        setTimeout( () =>
+        {
+            if ( existingBanner.parentNode )
+            {
+                existingBanner.remove();
+            }
+        }, 300 );
+    }
+}
+
+/**
+ * Set up service worker message handling
+ * Coordinate between service worker and main app connection state
+ */
+function setupServiceWorkerMessages ()
+{
+    if ( 'serviceWorker' in navigator )
+    {
+        navigator.serviceWorker.addEventListener( 'message', event =>
+        {
+            const { data } = event;
+
+            if ( data && data.type === 'sw-event' )
+            {
+                console.log( 'Service Worker Event:', data.event );
+
+                switch ( data.event )
+                {
+                    case 'connection-restored':
+                        handleSuccessfulConnection();
+                        break;
+
+                    case 'connection-failed':
+                        // Let the main app handle this through HTMX error events
+                        // to avoid duplicate error handling
+                        break;
+                }
+            }
+        } );
+    }
 }

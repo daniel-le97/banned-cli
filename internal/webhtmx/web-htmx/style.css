@@ -765,8 +765,9 @@ body {
   }
 }
 
-/* Offline indicator */
-.status.offline {
+/* Connection Status Indicators */
+.status.offline,
+.status.server-offline {
   background: #d32f2f;
   color: #fff;
   padding: 0.25rem 0.5rem;
@@ -774,6 +775,129 @@ body {
   font-size: 0.8rem;
 }
 
-.status.offline .indicator {
+.status.offline .indicator,
+.status.server-offline .indicator {
   color: #ffcdd2;
+}
+
+.status.checking {
+  background: #ff9800;
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.status.checking .indicator {
+  color: #fff3e0;
+  animation: pulse 1s infinite;
+}
+
+.status.retrying {
+  background: #ff5722;
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.status.retrying .indicator {
+  color: #ffccbc;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Offline Notification Banner */
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #d32f2f;
+  color: #fff;
+  z-index: 1000;
+  transform: translateY(-100%);
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.offline-banner.show {
+  transform: translateY(0);
+}
+
+.offline-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  gap: 0.75rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.offline-banner-icon {
+  font-size: 1.2rem;
+}
+
+.offline-banner-message {
+  flex: 1;
+  text-align: center;
+  font-weight: 500;
+}
+
+.offline-banner-button {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.offline-banner-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.offline-banner-close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.offline-banner-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Adjust main content when banner is shown */
+body:has(.offline-banner.show) #app {
+  margin-top: 60px;
+}
+
+/* Simple error state for failed requests */
+.htmx-request-error {
+  color: #ff9800;
+  font-size: 0.9rem;
+  font-style: italic;
+  opacity: 0.8;
 }

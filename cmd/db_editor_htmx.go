@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net"
@@ -155,10 +156,21 @@ func startHtmxWebEditor(port int) error {
 	http.HandleFunc("/htmx/table/data/", handleHtmxTableData)
 	http.HandleFunc("/htmx/table/schema/", handleHtmxTableSchema)
 
-	// Health check endpoint with HTMX response
+	// Health check endpoints
 	http.HandleFunc("/htmx/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprintf(w, `<span class="indicator">●</span><span>Connected</span>`)
+	})
+
+	// JSON health check endpoint for compatibility
+	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		dbPath, _ := db.GetDatabasePath()
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":    "ok",
+			"database":  dbPath,
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
 	})
 
 	serverAddr := ":" + strconv.Itoa(port)
