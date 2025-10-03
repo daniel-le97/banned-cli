@@ -16,7 +16,7 @@
     <link rel="apple-touch-icon" href="/web-htmx/icons/icon-192x192.png">
 
     <!-- iOS PWA meta tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="DB Editor">
 
@@ -25,84 +25,203 @@
     <meta name="msapplication-TileImage" content="/web-htmx/icons/icon-144x144.png">
 
     <title>Database Editor - HTMX</title>
-    <link rel="stylesheet" href="/web-htmx/style.css">
-    <script src="/web-htmx/htmx.js"></script>
-    <script src="/web-htmx/hyperscript.js"></script>
-    <script src="/web-htmx/app.js"></script>
+    <link rel="stylesheet" href="/web-htmx/vendor/daisy5.css">
+    <link rel="stylesheet" href="/web-htmx/vendor/daisy5themes.css">
+    <script src="/web-htmx/vendor/tailwind4.js"></script>
+    <script src="/web-htmx/vendor/htmx.js"></script>
+    <script src="/web-htmx/vendor/hyperscript.js"></script>
+    <script src="/web-htmx/lib/app.js"></script>
+    </script>
 </head>
 
-<body>
-    <div id="app">
-        <!-- Header -->
-        <header class="header">
-            <h1>Database Editor (HTMX)</h1>
-            <div class="status" hx-get="/api/health" hx-trigger="load, every 30s" hx-target="this" hx-swap="innerHTML">
-                <span class="indicator">●</span>
-                <span>Connecting...</span>
-            </div>
-        </header>
+<body class="bg-base-200 text-base-content">
+    <!-- 
+    DaisyUI Semantic Colors Implementation:
+    - bg-base-200: Light background that switches to dark in dark mode
+    - bg-base-100: Content background (lighter than base-200)
+    - bg-base-300: Borders and dividers
+    - text-base-content: Text that automatically switches for contrast
+    - Automatic theme switching with zero maintenance
+    -->
+    <div id="app" class="drawer lg:drawer-open">
+        <!-- Drawer toggle for mobile -->
+        <input id="drawer-toggle" type="checkbox" class="drawer-toggle" />
 
-        <!-- Main Layout -->
-        <div class="layout">
-            <!-- Sidebar -->
-            <aside class="sidebar" id="sidebar">
-                <button class="sidebar-toggle" _="on click toggle .collapsed on #sidebar" title="Toggle sidebar">
-                    ←
-                </button>
+        <!-- Main content -->
+        <div class="drawer-content flex flex-col">
+            <!-- Header -->
+            <header class="navbar bg-primary text-primary-content shadow">
+                <div class="navbar-start flex items-center gap-2">
+                    <label for="drawer-toggle" class="btn btn-square btn-ghost lg:hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            class="inline-block w-6 h-6 stroke-current">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </label>
 
-                <div class="sidebar-content">
-                    <!-- Database Stats -->
-                    <div class="stats-section" hx-get="/htmx/stats" hx-trigger="load, every 60s" hx-target="this"
-                        hx-swap="innerHTML">
-                        <div class="loading stats-loading">
-                            <div>
-                                <h3 style="color: #4fc3f7; margin-bottom: 0.75rem; font-size: 1rem;">Database Statistics
-                                </h3>
-                                <div style="opacity: 0.6;">Loading stats...</div>
+                    <!-- Status Display -->
+                    <div class="status indicator flex-shrink-0" hx-get="/htmx/health" hx-trigger="load, every 30s"
+                        hx-target="this" hx-swap="innerHTML">
+                        <span class="indicator-item badge badge-success badge-xs"></span>
+                        <span class="text-xs">Connecting...</span>
+                    </div>
+                </div>
+
+                <div class="navbar-center">
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <span class="text-xl sm:text-2xl">🗄️</span>
+                        <h1 class="text-lg sm:text-xl font-bold hidden xs:block">Database Editor</h1>
+                        <h1 class="text-lg font-bold block xs:hidden">DB Editor</h1>
+                        <div class="badge badge-accent badge-xs sm:badge-sm">HTMX</div>
+                    </div>
+                </div>
+
+                <div class="navbar-end">
+                    <!-- Theme Selector -->
+                    <div class="dropdown dropdown-end">
+                        <div tabindex="0" role="button" class="btn btn-ghost btn-circle" title="Change Theme">
+                            <span class="text-lg">🎨</span>
+                        </div>
+                        <div tabindex="0"
+                            class="dropdown-content bg-base-100 border-base-300 rounded-box z-[60] p-4 shadow text-base-content max-h-80 overflow-y-auto"
+                            style="width: 800px; max-width: 90vw;">
+                            <h3 class="text-lg font-semibold mb-3 text-center">🎨 Choose Theme</h3>
+                            <div class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('light')">☀️
+                                    Light</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('dark')">🌙
+                                    Dark</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('cupcake')">🧁 Cupcake</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('bumblebee')">🐝 Bumblebee</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('emerald')">💎 Emerald</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('corporate')">🏢 Corporate</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('synthwave')">🌈 Synthwave</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('retro')">📼
+                                    Retro</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('cyberpunk')">🤖 Cyberpunk</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('valentine')">💖 Valentine</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('halloween')">🎃 Halloween</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('garden')">🌸
+                                    Garden</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('forest')">🌲
+                                    Forest</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('aqua')">💧
+                                    Aqua</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('lofi')">🎵
+                                    Lo-Fi</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('pastel')">🌸
+                                    Pastel</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('fantasy')">✨
+                                    Fantasy</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('wireframe')">📝 Wireframe</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('black')">⚫
+                                    Black</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('luxury')">👑
+                                    Luxury</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('dracula')">🧛 Dracula</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('cmyk')">🖨️
+                                    CMYK</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('autumn')">🍂
+                                    Autumn</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('business')">💼 Business</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('acid')">🧪
+                                    Acid</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary"
+                                    onclick="setTheme('lemonade')">🍋 Lemonade</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('night')">🌃
+                                    Night</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('coffee')">☕
+                                    Coffee</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('winter')">❄️
+                                    Winter</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('dim')">🔅
+                                    Dim</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('nord')">🌌
+                                    Nord</button>
+                                <button class="btn btn-sm btn-outline hover:btn-primary" onclick="setTheme('sunset')">🌅
+                                    Sunset</button>
                             </div>
                         </div>
                     </div>
+                </div>
+            </header>
 
-                    <!-- Tables List -->
-                    <div class="tables-section" hx-get="/htmx/tables" hx-trigger="load" hx-target="this"
+            <!-- Main Content Area -->
+            <main class="flex-1 p-4 bg-base-200">
+                <!-- Tabs -->
+                <div class="tabs tabs-lifted mb-4">
+                    <button class="tab tab-active text-base-content" onclick="switchToDataTab()"
+                        hx-target="#tab-content" hx-swap="innerHTML">
+                        📊 Data
+                    </button>
+                    <button class="tab text-base-content" onclick="switchToSchemaTab()" hx-target="#tab-content"
                         hx-swap="innerHTML">
-                        <div class="loading tables-loading">
-                            <div>
-                                <h3 style="color: #ffb74d; margin-bottom: 0.75rem; font-size: 1rem;">Database Tables
-                                </h3>
-                                <div style="opacity: 0.6;">Loading tables...</div>
+                        🏗️ Schema
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div id="tab-content" class="card bg-base-100 border-base-300 shadow min-h-96 text-base-content">
+                    <div class="card-body flex flex-col items-center justify-center text-center">
+                        <div class="text-6xl mb-4">📊</div>
+                        <h3 class="card-title text-base-content mb-2">Select a Table</h3>
+                        <p class="text-base-content">Choose a table from the sidebar to view its data or schema.</p>
+                        <div class="card-actions">
+                            <div class="badge badge-info badge-outline">Ready to explore</div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="drawer-side">
+            <label for="drawer-toggle" class="drawer-overlay cursor-pointer"></label>
+            <aside class="menu p-4 w-80 min-h-full bg-base-200 text-base-content">
+                <!-- Database Stats -->
+                <div class="mb-6" hx-get="/htmx/stats" hx-trigger="load, every 60s" hx-target="this"
+                    hx-swap="innerHTML">
+                    <div class="stats bg-primary text-primary-content shadow w-full">
+                        <div class="stat">
+                            <div class="stat-title text-primary-content">📈 Database Statistics</div>
+                            <div class="stat-value text-sm text-primary-content">
+                                <span class="loading loading-dots loading-sm"></span>
+                                Loading stats...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tables List -->
+                <div class="w-full" hx-get="/htmx/tables" hx-trigger="load" hx-target="this" hx-swap="innerHTML">
+                    <div class="card bg-base-100 border-base-300 shadow text-base-content w-full">
+                        <div class="card-body">
+                            <h3 class="card-title text-base-content">
+                                🗂️ Database Tables
+                                <div class="badge badge-primary badge-sm">Active</div>
+                            </h3>
+                            <div class="flex items-center gap-2 text-base-content">
+                                <span class="loading loading-spinner loading-sm"></span>
+                                <span class="text-sm">Loading tables...</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </aside>
-
-            <!-- Main Content -->
-            <main class="main-content">
-                <!-- Tabs -->
-                <div class="tabs">
-                    <button class="tab active" hx-get="/htmx/tab/data" hx-target="#tab-content" hx-swap="innerHTML"
-                        _="on click remove .active from .tab then add .active to me">
-                        Data
-                    </button>
-                    <button class="tab" hx-get="/htmx/tab/schema" hx-target="#tab-content" hx-swap="innerHTML"
-                        _="on click remove .active from .tab then add .active to me">
-                        Schema
-                    </button>
-                </div>
-
-                <!-- Tab Content -->
-                <div id="tab-content" class="tab-content">
-                    <div class="placeholder">
-                        <h3>Select a Table</h3>
-                        <p>Choose a table from the sidebar to view its data or schema.</p>
-                    </div>
-                </div>
-            </main>
         </div>
     </div>
-
-
 </body>
 
 </html>

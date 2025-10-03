@@ -1,37 +1,64 @@
-<div class="schema-container">
-    <div class="schema-header">
-        <h3>Table Schema: {{.TableName}}</h3>
-        <p class="schema-description">Fields and data types for records in this table</p>
-    </div>
-    <div class="table-wrapper">
-        <table class="schema-table">
-            <thead>
-                <tr>
-                    <th>Field Name</th>
-                    <th>Data Type</th>
-                    <th>Constraints</th>
-                    <th>Default Value</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Columns}}
-                <tr>
-                    <td>
-                        <span class="field-name">{{.Name}}</span>
-                        {{if .Primary}}<span class="primary-badge">PK</span>{{end}}
-                    </td>
-                    <td><span class="type-badge">{{.Type}}</span></td>
-                    <td>
-                        {{if .Primary}}<span class="constraint-badge">PRIMARY KEY</span>{{end}}
-                        {{if .NotNull}}<span class="constraint-badge">NOT NULL</span>{{end}}
-                        {{if and (not .Primary) (not .NotNull)}}—{{end}}
-                    </td>
-                    <td>{{if .Default}}{{.Default}}
-                        {{else}}—{{end}}
-                    </td>
-                </tr>
+<div class="card bg-base-100 border-base-300 shadow text-base-content">
+    <div class="card-body min-h-full">
+        <h3 class="card-title text-base-content">
+            🏗️ Schema: {{.TableName}}
+        </h3>
+        <p class="text-base-content opacity-70 mb-4">Fields and data types for records in this table</p>
+
+        <div class="overflow-x-auto min-h-96">
+            {{if .Columns}}
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        <th class="text-base-content">Field Name</th>
+                        <th class="text-base-content">Data Type</th>
+                        <th class="text-base-content">Constraints</th>
+                        <th class="text-base-content">Default Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Columns}}
+                    <tr>
+                        <td>
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-base-content">{{.Name}}</span>
+                                {{if .Primary}}
+                                <div class="badge badge-primary badge-xs">PK</div>{{end}}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="badge badge-secondary badge-sm">{{.Type}}</div>
+                        </td>
+                        <td>
+                            <div class="flex flex-wrap gap-1">
+                                {{if .Primary}}
+                                <div class="badge badge-warning badge-xs">PRIMARY KEY</div>{{end}}
+                                {{if .NotNull}}
+                                <div class="badge badge-error badge-xs">NOT NULL</div>{{end}}
+                                {{if and (not .Primary) (not .NotNull)}}<span
+                                    class="text-base-content opacity-50">—</span>{{end}}
+                            </div>
+                        </td>
+                        <td>
+                            {{if .Default}}
+                            <code class="bg-base-200 text-base-content px-2 py-1 rounded text-sm">{{.Default}}</code>
+                            {{else}}
+                                <span class="text-base-content opacity-50">—</span>
+                                {{end}}
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            {{else}}
+                <!-- Empty State -->
+                <div class="flex flex-col items-center justify-center min-h-96 text-center">
+                    <div class="text-6xl mb-4">🏗️</div>
+                    <h4 class="text-xl font-semibold text-base-content mb-2">No Schema Information</h4>
+                    <p class="text-base-content opacity-70">Unable to retrieve schema details for this table.</p>
+                    <div class="badge badge-warning badge-outline mt-4">Schema Unavailable</div>
+                </div>
                 {{end}}
-            </tbody>
-        </table>
+        </div>
     </div>
 </div>

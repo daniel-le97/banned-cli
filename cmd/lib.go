@@ -501,22 +501,6 @@ func (c *Client) FetchChannelData(channelID string) error {
 	if err := StoreChannel(channel); err != nil {
 		return fmt.Errorf("failed to store channel in database: %w", err)
 	}
-
-	// Also write response to file for backup/debugging
-	outputData, err := json.MarshalIndent(response, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal output: %w", err)
-	}
-
-	// Create data directory if it doesn't exist
-	if err := os.MkdirAll("data", 0755); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
-	}
-
-	if err := os.WriteFile("data/channel.json", outputData, 0644); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-
 	return nil
 }
 
@@ -577,21 +561,6 @@ func (c *Client) FetchAllChannels() error {
 		if err := StoreChannel(channel); err != nil {
 			fmt.Printf("Warning: failed to store channel %s in database: %v\n", channel.ID, err)
 		}
-	}
-
-	// Write response to file for backup/debugging
-	outputData, err := json.MarshalIndent(response, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal output: %w", err)
-	}
-
-	// Create data directory if it doesn't exist
-	if err := os.MkdirAll("data", 0755); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
-	}
-
-	if err := os.WriteFile("data/all_channels.json", outputData, 0644); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
 	}
 
 	return nil

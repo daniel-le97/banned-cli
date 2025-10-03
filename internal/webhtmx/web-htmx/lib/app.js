@@ -53,6 +53,7 @@ document.addEventListener( 'DOMContentLoaded', function ()
 
     setupHTMXConfiguration();
     setupClipboardFunctionality();
+    setupThemeFunctionality();
     registerServiceWorker();
 } );
 
@@ -129,10 +130,11 @@ function setupClipboardFunctionality ()
         function ( event )
         {
             const target = /** @type {HTMLElement} */ ( event.target );
+            const cell = target.classList.contains( 'copyable-cell' ) ? target : target.closest( '.copyable-cell' );
 
-            if ( target && target.classList.contains( 'copyable-cell' ) )
+            if ( cell )
             {
-                handleCellCopy( target );
+                handleCellCopy( cell );
             }
         }
     );
@@ -156,7 +158,7 @@ function handleCellCopy ( cell )
     if ( navigator.clipboard && navigator.clipboard.writeText )
     {
         navigator.clipboard.writeText( text )
-            .then( () => showCopyFeedback( cell, 'Copied!' ) )
+            .then( () => showCopyFeedback( cell, '📋 Copied!' ) )
             .catch( ( err ) =>
             {
                 console.error( 'Failed to copy: ', err );
@@ -176,17 +178,37 @@ function handleCellCopy ( cell )
  */
 function showCopyFeedback ( cell, message )
 {
+    // Store original classes to restore later
+    const originalClasses = cell.className;
+
     // Add copied class for CSS animation
     cell.classList.add( 'copied' );
+
+    // Apply background color change effect using DaisyUI classes
+    cell.classList.add( 'bg-success', 'text-success-content', 'transition-colors', 'duration-300' );
 
     // Create and show tooltip
     const tooltip = createTooltip( message );
     cell.appendChild( tooltip );
 
-    // Remove feedback after animation completes
+    // Start removing background color after a brief moment
+    setTimeout( () =>
+    {
+        cell.classList.remove( 'bg-success', 'text-success-content' );
+        cell.classList.add( 'transition-colors', 'duration-500' );
+    }, 200 );
+
+    // Remove all feedback after animation completes
     setTimeout( () =>
     {
         removeCopyFeedback( cell, tooltip );
+        // Restore original classes
+        cell.className = originalClasses;
+        // Re-add copyable-cell class in case it was removed
+        if ( !cell.classList.contains( 'copyable-cell' ) )
+        {
+            cell.classList.add( 'copyable-cell' );
+        }
     }, 600 );
 }
 
@@ -282,7 +304,7 @@ function registerServiceWorker ()
             try
             {
                 // Register the service worker
-                const registration = await navigator.serviceWorker.register( '/web-htmx/sw.js' );
+                const registration = await navigator.serviceWorker.register( '/web-htmx/lib/sw.js' );
 
                 console.log( 'Service Worker registered successfully:', registration.scope );
 
@@ -303,7 +325,7 @@ function registerServiceWorker ()
                 } );
 
                 // Handle offline/online events
-                setupOfflineDetection();
+                // setupOfflineDetection(); // Disabled - HTMX handles status display now
 
                 // Listen for service worker messages
                 setupServiceWorkerMessages();
@@ -354,7 +376,7 @@ function showUpdateNotification ()
  */
 function setupOfflineDetection ()
 {
-    const statusElement = document.querySelector( '.status' );
+    // const statusElement = document.querySelector( '.status' ); // Not needed - HTMX handles status
 
     function updateConnectionStatus ()
     {
@@ -366,7 +388,7 @@ function setupOfflineDetection ()
             console.log( 'Browser is offline' );
             state.isOnline = false;
             state.offlineMode = true;
-            updateStatusDisplay( statusElement, 'offline', 'No Internet Connection' );
+            // Status display is handled by HTMX now
             showOfflineMessage();
         }
         else if ( state.offlineMode )
@@ -374,7 +396,7 @@ function setupOfflineDetection ()
             // Browser came back online, but we need to check server
             console.log( 'Browser back online - checking server...' );
             state.isOnline = true;
-            updateStatusDisplay( statusElement, 'checking', 'Reconnecting...' );
+            // Status display is handled by HTMX now
             checkServerHealth();
         }
         else
@@ -383,7 +405,7 @@ function setupOfflineDetection ()
             console.log( 'App is online' );
             state.isOnline = true;
             state.offlineMode = false;
-            updateStatusDisplay( statusElement, 'online', 'Connected' );
+            // Status display is handled by HTMX now
             hideOfflineMessage();
         }
     }
@@ -407,16 +429,10 @@ function handleSuccessfulConnection ()
     const state = window.connectionState;
     state.lastSuccessfulRequest = Date.now();
     state.retryCount = 0;
-    state.isOnline = true;
+    state.offlineMode = false;
 
-    if ( state.offlineMode )
-    {
-        state.offlineMode = false;
-        const statusElement = document.querySelector( '.status' );
-        updateStatusDisplay( statusElement, 'online', 'Connected' );
-        hideOfflineMessage();
-        console.log( 'Connection restored!' );
-    }
+    // Status display is handled by HTMX now
+    hideOfflineMessage();
 }
 
 /**
@@ -459,7 +475,7 @@ function handleTimeoutError ()
 function handleServerUnavailable ()
 {
     const state = window.connectionState;
-    const statusElement = document.querySelector( '.status' );
+    // const statusElement = document.querySelector( '.status' ); // Not needed - HTMX handles status
 
     if ( navigator.onLine && !state.offlineMode )
     {
@@ -470,13 +486,13 @@ function handleServerUnavailable ()
         {
             // Enter offline mode after max retries
             state.offlineMode = true;
-            updateStatusDisplay( statusElement, 'server-offline', 'Server Offline' );
+            // Status display is handled by HTMX now
             showOfflineMessage( 'Server is offline. Please restart the banned-cli application.' );
         }
         else
         {
-            // Show retry state briefly
-            updateStatusDisplay( statusElement, 'retrying', 'Reconnecting...' );
+            // Retry connection briefly
+            // Status display is handled by HTMX now
             setTimeout( () => checkServerHealth(), state.retryInterval );
         }
     }
@@ -492,17 +508,49 @@ function updateStatusDisplay ( statusElement, state, message )
 {
     if ( !statusElement ) return;
 
-    // Remove all state classes
-    statusElement.classList.remove( 'error', 'offline', 'checking', 'retrying', 'server-offline' );
+    let dotClass = 'bg-success';
+    let textClass = 'text-success';
 
-    // Add appropriate class
-    if ( state !== 'online' )
+    // Determine status styling based on state
+    switch ( state ) 
     {
-        statusElement.classList.add( state );
+        case 'offline':
+        case 'server-offline':
+            dotClass = 'bg-error';
+            textClass = 'text-error';
+            break;
+        case 'checking':
+        case 'retrying':
+            dotClass = 'bg-warning animate-pulse';
+            textClass = 'text-warning';
+            break;
+        default: // online
+            dotClass = 'bg-success';
+            textClass = 'text-success';
     }
 
-    // Update content
-    statusElement.innerHTML = `<span class="indicator">●</span><span>${ message }</span>`;
+    // Update content with proper DaisyUI indicator structure
+    let badgeClass = 'badge-success';
+
+    // Determine badge styling based on state
+    switch ( state ) 
+    {
+        case 'offline':
+        case 'server-offline':
+            badgeClass = 'badge-error';
+            break;
+        case 'checking':
+        case 'retrying':
+            badgeClass = 'badge-warning';
+            break;
+        default: // online
+            badgeClass = 'badge-success';
+    }
+
+    statusElement.innerHTML = `
+        <span class="indicator-item badge ${ badgeClass } badge-xs"></span>
+        <span class="text-sm">${ message }</span>
+    `;
 }
 
 /**
@@ -574,13 +622,21 @@ function showOfflineMessage ( customMessage )
 
     const offlineBanner = document.createElement( 'div' );
     offlineBanner.id = 'offline-banner';
-    offlineBanner.className = 'offline-banner';
+    offlineBanner.className = 'alert alert-error fixed top-0 left-0 right-0 z-50 rounded-none shadow transform -translate-y-full transition-transform duration-300';
     offlineBanner.innerHTML = `
-        <div class="offline-banner-content">
-            <span class="offline-banner-icon">⚠️</span>
-            <span class="offline-banner-message">${ message }</span>
-            <button onclick="window.location.reload()" class="offline-banner-button">Retry</button>
-            <button onclick="hideOfflineMessage()" class="offline-banner-close">×</button>
+        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span class="flex-1">${ message }</span>
+        <div class="flex gap-2">
+            <button onclick="window.location.reload()" class="btn btn-sm btn-outline">
+                🔄 Retry
+            </button>
+            <button onclick="hideOfflineMessage()" class="btn btn-sm btn-square btn-ghost">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
     `;
 
@@ -589,7 +645,8 @@ function showOfflineMessage ( customMessage )
     // Show with animation
     setTimeout( () =>
     {
-        offlineBanner.classList.add( 'show' );
+        offlineBanner.classList.remove( '-translate-y-full' );
+        offlineBanner.classList.add( 'translate-y-0' );
     }, 100 );
 }
 
@@ -601,7 +658,8 @@ function hideOfflineMessage ()
     const existingBanner = document.getElementById( 'offline-banner' );
     if ( existingBanner )
     {
-        existingBanner.classList.remove( 'show' );
+        existingBanner.classList.remove( 'translate-y-0' );
+        existingBanner.classList.add( '-translate-y-full' );
         setTimeout( () =>
         {
             if ( existingBanner.parentNode )
@@ -643,3 +701,166 @@ function setupServiceWorkerMessages ()
         } );
     }
 }
+
+/**
+ * Setup theme functionality - load saved theme and initialize theme switching
+ */
+function setupThemeFunctionality ()
+{
+    // Load saved theme from localStorage or default to 'light'
+    const savedTheme = localStorage.getItem( 'selected-theme' ) || 'light';
+    setTheme( savedTheme );
+
+    console.log( `Theme system initialized with: ${ savedTheme }` );
+}
+
+/**
+ * Set the application theme
+ * @param {string} themeName - The DaisyUI theme name to apply
+ */
+function setTheme ( themeName )
+{
+    // Apply theme to document
+    document.documentElement.setAttribute( 'data-theme', themeName );
+
+    // Save theme to localStorage
+    localStorage.setItem( 'selected-theme', themeName );
+
+    console.log( `Theme changed to: ${ themeName }` );
+
+    // Close dropdown after selection (DaisyUI dropdown handling)
+    const dropdown = document.querySelector( '.dropdown' );
+    if ( dropdown )
+    {
+        // Remove focus from any focused dropdown elements to close it
+        const dropdownContent = dropdown.querySelector( '.dropdown-content' );
+        const dropdownButton = dropdown.querySelector( '[tabindex="0"][role="button"]' );
+
+        if ( dropdownContent )
+        {
+            dropdownContent.blur();
+        }
+        if ( dropdownButton )
+        {
+            dropdownButton.blur();
+        }
+
+        // Also remove focus from document active element if it's in the dropdown
+        if ( document.activeElement && dropdown.contains( document.activeElement ) )
+        {
+            document.activeElement.blur();
+        }
+
+        // Force close by clicking outside (simulate)
+        document.body.click();
+    }
+
+    // Show brief feedback
+    showThemeChangeNotification( themeName );
+}
+
+/**
+ * Show a brief notification when theme changes
+ * @param {string} themeName - The theme that was applied
+ */
+function showThemeChangeNotification ( themeName )
+{
+    const notification = document.createElement( 'div' );
+    notification.className = 'toast toast-top toast-start z-40';
+    notification.innerHTML = `
+        <div class="alert alert-success bg-success text-success-content shadow">
+            <div class="flex items-center gap-2">
+                <span>🎨</span>
+                <span>Theme changed to ${ themeName }</span>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild( notification );
+
+    // Remove notification after 2 seconds
+    setTimeout( () =>
+    {
+        if ( notification.parentNode )
+        {
+            notification.parentNode.removeChild( notification );
+        }
+    }, 2000 );
+}
+
+/**
+ * Switch to the Data tab
+ */
+function switchToDataTab ()
+{
+    // Update tab active states
+    document.querySelectorAll( '.tab' ).forEach( tab => tab.classList.remove( 'tab-active' ) );
+    document.querySelector( '.tab:first-child' ).classList.add( 'tab-active' );
+
+    const tabContent = document.getElementById( 'tab-content' );
+
+    if ( window.selectedTable )
+    {
+        // Load data for selected table
+        htmx.ajax( 'GET', `/htmx/table/data/${ window.selectedTable }`, {
+            target: '#tab-content',
+            swap: 'innerHTML'
+        } );
+    } else
+    {
+        // Show default data tab message
+        tabContent.innerHTML = `
+            <div class="card bg-base-100 border-base-300 shadow min-h-96 text-base-content">
+                <div class="card-body flex flex-col items-center justify-center text-center">
+                    <div class="text-6xl mb-4">📊</div>
+                    <h3 class="card-title text-base-content mb-2">Select a Table</h3>
+                    <p class="text-base-content">Choose a table from the sidebar to view its data.</p>
+                    <div class="card-actions">
+                        <div class="badge badge-info badge-outline">Ready to explore</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Switch to the Schema tab
+ */
+function switchToSchemaTab ()
+{
+    // Update tab active states
+    document.querySelectorAll( '.tab' ).forEach( tab => tab.classList.remove( 'tab-active' ) );
+    document.querySelector( '.tab:last-child' ).classList.add( 'tab-active' );
+
+    const tabContent = document.getElementById( 'tab-content' );
+
+    if ( window.selectedTable )
+    {
+        // Load schema for selected table
+        htmx.ajax( 'GET', `/htmx/table/schema/${ window.selectedTable }`, {
+            target: '#tab-content',
+            swap: 'innerHTML'
+        } );
+    } else
+    {
+        // Show default schema tab message
+        tabContent.innerHTML = `
+            <div class="card bg-base-100 border-base-300 shadow min-h-96 text-base-content">
+                <div class="card-body flex flex-col items-center justify-center text-center">
+                    <div class="text-6xl mb-4">🏗️</div>
+                    <h3 class="card-title text-base-content mb-2">Select a Table</h3>
+                    <p class="text-base-content">Choose a table from the sidebar to view its schema.</p>
+                    <div class="card-actions">
+                        <div class="badge badge-info badge-outline">Ready to explore</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Make functions globally accessible for onclick handlers
+window.setTheme = setTheme;
+window.switchToDataTab = switchToDataTab;
+window.switchToSchemaTab = switchToSchemaTab;

@@ -1,40 +1,47 @@
-<div class="data-container">
-    <div class="table-header">
-        <h3 class="table-title">Table: {{.TableName}}</h3>
-        <div class="table-controls">
-            <input type="text" class="search-box" placeholder="Search..." hx-post="/htmx/search/{{.TableName}}"
-                hx-target=".table-wrapper" hx-swap="innerHTML" hx-trigger="keyup changed delay:300ms">
-            <button class="btn btn-refresh" hx-get="/htmx/table/data/{{.TableName}}" hx-target="#tab-content"
-                hx-swap="innerHTML">
-                Refresh
+<div class="card bg-base-100 border-base-300 shadow text-base-content">
+    <div class="card-body min-h-full">
+        <h3 class="card-title text-base-content">
+            📋 Table: {{.TableName}}
+        </h3>
+        <div class="flex gap-2 mb-4">
+            <input type="text" class="input input-bordered bg-base-100 text-base-content border-base-300 flex-1"
+                placeholder="Search records..." hx-post="/htmx/search/{{.TableName}}" hx-target=".table-wrapper"
+                hx-swap="innerHTML" hx-trigger="keyup changed delay:300ms">
+            <button class="btn btn-primary text-primary-content" hx-get="/htmx/table/data/{{.TableName}}"
+                hx-target="#tab-content" hx-swap="innerHTML">
+                🔄 Refresh
             </button>
         </div>
-    </div>
-    <div class="table-wrapper">
-        {{if .Data}}
-        <table class="data-table">
-            <thead>
-                <tr>
-                    {{range .Columns}}
-                    <th>{{.}}</th>
+        <div class="table-wrapper overflow-x-auto min-h-96">
+            {{if .Data}}
+            <table class="table table-zebra w-full">
+                <thead>
+                    <tr>
+                        {{range .Columns}}
+                        <th>{{.}}</th>
+                        {{end}}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Data}}
+                    {{$row := .}}
+                    <tr>
+                        {{range $.Columns}}
+                        <td class="copyable-cell" title="Click to copy to clipboard">
+                            {{index $row .}}
+                        </td>
+                        {{end}}
+                    </tr>
                     {{end}}
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Data}}
-                {{$row := .}}
-                <tr>
-                    {{range $.Columns}}
-                    <td class="copyable-cell" title="Click to copy to clipboard">{{index $row .}}</td>
-                    {{end}}
-                </tr>
+                </tbody>
+            </table>
+            {{else}}
+                <div class="flex flex-col items-center justify-center min-h-96 text-center">
+                    <div class="text-4xl mb-4">📄</div>
+                    <h4 class="text-lg font-semibold text-base-content mb-2">No Data Found</h4>
+                    <p class="text-base-content opacity-70">This table doesn't contain any records yet.</p>
+                    <div class="badge badge-info badge-outline mt-2">Empty Table</div>
+                </div>
                 {{end}}
-            </tbody>
-        </table>
-        {{else}}
-            <div class="placeholder">
-                <p>No data found in this table.</p>
-            </div>
-            {{end}}
+        </div>
     </div>
-</div>

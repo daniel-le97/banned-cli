@@ -11,10 +11,12 @@ const API_CACHE = 'api-v3';
 const STATIC_FILES = [
     '/htmx/',
     '/web-htmx/index.html',
-    '/web-htmx/style.css',
-    '/web-htmx/app.js',
-    '/web-htmx/htmx.js',
-    '/web-htmx/hyperscript.js',
+    '/web-htmx/vendor/daisy5.css',
+    '/web-htmx/vendor/daisy5themes.css',
+    '/web-htmx/vendor/tailwind4.js',
+    '/web-htmx/lib/app.js',
+    '/web-htmx/vendor/htmx.js',
+    '/web-htmx/vendor/hyperscript.js',
     '/web-htmx/manifest.json',
     '/web-htmx/icons/icon-192x192.png',
     '/web-htmx/icons/icon-512x512.png'
@@ -330,7 +332,7 @@ function createOfflineTablesResponse ()
 {
     const offlineTables = `
         <div class="tables-section">
-            <h3 style="color: #ffb74d; margin-bottom: 0.75rem; font-size: 1rem;">
+            <h3 style="color: #fcb449ff; margin-bottom: 0.75rem; font-size: 1rem;">
                 Database Tables
             </h3>
             <div class="htmx-request-error">Server offline - tables unavailable</div>

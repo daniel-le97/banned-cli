@@ -1,14 +1,16 @@
-<div class="tables-content">
-    <h3>Database Tables</h3>
-    <ul class="table-list">
-        {{range .}}
-        <li class="table-item" hx-get="/htmx/table/data/{{.Name}}" hx-target="#tab-content" hx-swap="innerHTML" _="on click remove .active from .table-item then add .active to me
-	           on click set window.selectedTable to '{{.Name}}'">
-            <div class="table-link">
-                <div class="table-name">{{.Name}}</div>
-                <div class="table-count">{{.Count}} records</div>
+<ul class="menu bg-base-100 text-base-content w-full">
+    <li class="menu-title text-base-content">🗂️ Database Tables</li>
+    {{range .}}
+    <li>
+        <a class="text-base-content hover:bg-base-200" hx-get="/htmx/table/data/{{.Name}}" hx-target="#tab-content"
+            hx-swap="innerHTML"
+            _="on click remove .menu-active from <a/> in .menu then add .menu-active to me then set window.selectedTable to '{{.Name}}'">
+            <span>📋</span>
+            <div>
+                <div class="font-semibold text-base-content">{{.Name}}</div>
+                <div class="text-xs text-base-content opacity-70">{{.Count}} records</div>
             </div>
-        </li>
-        {{end}}
-    </ul>
-</div>
+        </a>
+    </li>
+    {{end}}
+</ul>

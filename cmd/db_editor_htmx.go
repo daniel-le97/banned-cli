@@ -159,7 +159,7 @@ func startHtmxWebEditor(port int) error {
 	// Health check endpoints
 	http.HandleFunc("/htmx/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, `<span class="indicator">●</span><span>Connected</span>`)
+		fmt.Fprintf(w, `<span class="indicator-item badge badge-success badge-xs"></span><span class="text-xs">Connected</span>`)
 	})
 
 	// JSON health check endpoint for compatibility
